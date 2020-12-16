@@ -1,5 +1,5 @@
 import { contains, indexof } from '../Array.js'
-import { Vector2 } from '../Vector2.js';
+import { Vector2 } from '../math/Vector2.js';
 
 
 
@@ -32,7 +32,6 @@ export class Input {
 
 
     constructor(update) {
-        update(this.#update.bind(this));
 
         window.addEventListener('keydown', (e) => {
             if (!contains(this.#currentKeysDown, [e.keyCode, e.location])) {
@@ -93,7 +92,7 @@ export class Input {
             }
         });
     }
-    #update() {
+    update() {
         this.#keysPressed = [];
         this.#keysReleased = [];
 

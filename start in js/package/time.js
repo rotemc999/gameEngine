@@ -5,8 +5,7 @@ export class Time {
     #nextSecond = 1000;
     #lastTime = 0
 
-    constructor(update) {
-        update(this.#update.bind(this));
+    constructor() {
     }
 
     get time() {
@@ -22,7 +21,7 @@ export class Time {
     }
 
 
-    #update() {
+    update() {
         this.#frames++;
         if (window.performance.now() >= this.#nextSecond) {
             this.#nextSecond = window.performance.now() + 1000;
