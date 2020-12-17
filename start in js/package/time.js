@@ -3,7 +3,7 @@ export class Time {
     #fps = 0;
     #frames = 0;
     #nextSecond = 1000;
-    #lastTime = 0
+    #lastTime = 0;
 
     constructor() {
     }
