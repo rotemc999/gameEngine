@@ -17,8 +17,23 @@ namespace GE {
                 throw new Error("Unable to initialize WebGL");
             }
 
+            this.checkConstChanges();
+
             return canvas;
 
+
+
+        }
+
+        private static checkConstChanges(): void {
+            if (gl.LINEAR != Mipmap.linear) {
+                console.log("linear mipmap number updated to: " + gl.LINEAR)
+            }
+            if (gl.NEAREST != Mipmap.nearest) {
+                console.log("linear mipmap number updated to: " + gl.NEAREST)
+            }
         }
     }
+
+
 }

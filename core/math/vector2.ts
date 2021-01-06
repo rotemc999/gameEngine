@@ -1,71 +1,87 @@
 namespace GE {
     export class Vector2 {
-        private x: number;
-        private y: number;
-        public limit: number = 0;
+        private _x: number;
+        private _y: number;
         public constructor(x: number, y: number) {
-            this.x = x;
-            this.y = y;
+            this._x = x;
+            this._y = y;
         }
 
         public static get up(): Vector2 {
             return new Vector2(0, 1);
         }
+        public static get down(): Vector2 {
+            return new Vector2(0, -1);
+        }
 
         public static get right(): Vector2 {
             return new Vector2(1, 0);
         }
+        public static get left(): Vector2 {
+            return new Vector2(-1, 0);
+        }
+
+
+        public get x(): number {
+            return this._x;
+        }
+        public set x(x: number) {
+            this._x = x;
+        }
+        public get y(): number {
+            return this._y;
+        }
+        public set y(y: number) {
+            this._y = y;
+        }
+
 
         public add(NewVector: Vector2) {
-            this.x += NewVector.x;
-            this.y += NewVector.y;
-            this.checkLimit();
+            this._x += NewVector.x;
+            this._y += NewVector.y;
             return this;
         }
         public sub(NewVector: Vector2) {
-            this.x -= NewVector.x;
-            this.y -= NewVector.y;
-            this.checkLimit();
+            this._x -= NewVector.x;
+            this._y -= NewVector.y;
             return this;
         }
 
         public multiply(number: number) {
-            this.x *= number;
-            this.y *= number;
-            this.checkLimit();
+            this._x *= number;
+            this._y *= number;
             return this;
         }
+        /*
+        public multiply(vector: Vector2) {
+            this._x *= vector.x;
+            this._y *= vector.y;
+            return this;
+        }*/
         public divide(number: number) {
-            this.x /= number;
-            this.y /= number;
-            this.checkLimit();
+            this._x /= number;
+            this._y /= number;
             return this;
 
         }
 
-        public mag() {
-            return Math.sqrt(this.x ** 2 + this.y ** 2);
+        public mag(): number {
+            return Math.sqrt(this._x ** 2 + this._y ** 2);
         }
-        public setMag(number: number) {
+        public setMag(number: number): void {
             this.normalize();
             this.multiply(number);
-            this.checkLimit();
         }
 
         public normalize() {
             let VectorLength = this.mag();
-            this.x /= VectorLength;
-            this.y /= VectorLength;
-            this.checkLimit();
+            this._x /= VectorLength;
+            this._y /= VectorLength;
 
         }
 
-        private checkLimit() {
-            if (this.limit !== 0) {
-                if (this.mag() > this.limit) {
-                    this.setMag(this.limit);
-                }
-            }
+        public toArray(): number[] {
+            return [this._x, this._y];
         }
     }
 }

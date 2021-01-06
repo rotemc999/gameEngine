@@ -62,12 +62,12 @@ namespace GE {
             gl.bindBuffer(this._targetBufferType, this._buffer);
 
             for (let attribute of this._attributes) {
-                gl.vertexAttribPointer(attribute.location, attribute.size, this._dataType, normalized, attribute.stride, attribute.offset * this._typeSize);
+                gl.vertexAttribPointer(attribute.location, attribute.size, this._dataType, normalized, attribute.stride * this._typeSize, attribute.offset * this._typeSize);
                 gl.enableVertexAttribArray(attribute.location);
             }
         }
 
-        /**
+        /** 
          * Unbinds this buffer.
          */
         public unbind(): void {
