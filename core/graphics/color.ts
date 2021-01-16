@@ -40,6 +40,11 @@ namespace GE {
             this._a = value;
         }
 
+        public toArray(): number[] {
+            let wieght = 1 / 255
+            return [wieght * this._r, wieght * this._g, wieght * this._b, wieght * this._a];
+        }
+
 
         public static black(): Color {
             return new Color(0, 0, 0, 255);

@@ -24,5 +24,9 @@ namespace GE {
         public update(): void {
 
         }
+
+        public render(shader: Shader) {
+
+        }
     }
 }

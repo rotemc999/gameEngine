@@ -1,7 +1,8 @@
 /// <reference path="core/engine.ts"/>
 
-var engine: GE.Engine = new GE.Engine();
+var engine: GE.Engine;
 window.onload = () => {
+    engine = new GE.Engine();
     engine.start();
 };
 

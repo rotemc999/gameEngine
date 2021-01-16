@@ -1,14 +1,10 @@
 namespace GE {
-    export function fileReader(path: string) {
-        let xhttp: XMLHttpRequest = new XMLHttpRequest();
-        xhttp.onreadystatechange = function () {
-            if (this.readyState == 4 && this.status == 200) {
-                xhttp.responseText;
-            }
-        };
-        xhttp.open("GET", path, true);
-        xhttp.send();
-
-
+    export function fileReader(path: string, callback: Function, name: string) {
+        let request: XMLHttpRequest = new XMLHttpRequest();
+        request.open("GET", path);
+        request.addEventListener("load", () => {
+            callback(request.responseText, name);
+        })
+        request.send();
     }
 }

@@ -164,8 +164,5 @@ export class Input {
     mousePosition() {
         return this.#mousePostion;
     }
-    mousePositionInScene() {
-
-    }
 }
 

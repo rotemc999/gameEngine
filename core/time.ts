@@ -1,10 +1,12 @@
 namespace GE {
     export class Time {
-        private static _deltaTime: number;
+        private static _deltaTime: number = 0;
         private static _frameRate: number = 0;
         private static _frames: number = 0;
         private static _nextSecond: number = 1000;
         private static _lastTime: number = 0;
+
+        private constructor() { }
 
         /**
          * update the time class every frame

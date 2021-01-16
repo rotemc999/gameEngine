@@ -5,7 +5,7 @@ namespace GE {
         private _children: GameObject[] = [];
         private _parent: GameObject | undefined;
         private _scene: Scene;
-        private _components: Component[];
+        private _components: Component[] = [];
         public enabled: boolean = true;
         public constructor(name: string, scene?: Scene) {
             this._name = name;
@@ -45,6 +45,10 @@ namespace GE {
             }
         }
 
+        public addComponent(component: Component): void {
+            this._components.push(component);
+        }
+
         public start(): void {
             if (!this.enabled) { return; }
             for (let i = 0; i < this._components.length; i++) {
@@ -70,6 +74,7 @@ namespace GE {
             for (let i: number = 0; i < this._children.length; i++) {
                 this._children[i].render(shader);
             }
+            this._components[0].render(shader);
         }
     }
 }

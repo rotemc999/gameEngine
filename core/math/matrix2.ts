@@ -29,12 +29,14 @@ namespace GE {
             return mat;
         }
 
-
-        public static transformations(position: Vector2): Matrix2 {
-            let mat = new Matrix2();
-
-            mat._data[12] = position.x;
-            mat._data[13] = position.y;
+        public static rotation(angle: number): Matrix2 {
+            let mat: Matrix2 = new Matrix2();
+            let cos = Math.cos(angle);
+            let sin = Math.sin(angle);
+            mat._data = [
+                cos, -sin,
+                sin, cos
+            ];
 
             return mat;
         }

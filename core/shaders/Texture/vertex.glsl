@@ -1,14 +1,19 @@
 precision mediump float;
 
-attribute vec3 position;
+attribute vec2 vertexPosition;
 attribute vec2 uv;
 
-varying fuv;
+varying vec2 fuv;
 
-uniform mat4 projection;
-uniform mat4 transformation;
+uniform mat2 projection;
+
+uniform vec2 position;
+uniform mat2 rotation;
+uniform vec2 scale;
 
 void main(){
     fuv = uv;
-    gl_Position = projection * transformation * vec4(position, 1);
+    fuv.y = 1.0 - fuv.y;
+    vec2 finalPosition = projection * (position + (vertexPosition  * scale * rotation));
+    gl_Position = vec4(finalPosition,0, 1);
 }

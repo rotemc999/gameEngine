@@ -7,3 +7,10 @@ body{
     background-color: black;
     overflow: hidden;
 }
+
+.fpsLabel{
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    color: white;
+}
