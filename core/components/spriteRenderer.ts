@@ -17,6 +17,7 @@ namespace GE {
                 0.5, -0.5, 1, 0,
                 -0.5, 0.5, 0, 1
             ];
+            
             this._buffer = new GLBuffer(3);
 
             // set buffer attributes
