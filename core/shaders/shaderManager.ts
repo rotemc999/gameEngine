@@ -10,8 +10,8 @@ namespace GE {
         }
 
         public static loadShader(vertexFilePath: string, fragmentFilePath: string, name: string): void {
-            fileReader(vertexFilePath, this.sourceCallback.bind(this), name + ".vertex");
-            fileReader(fragmentFilePath, this.sourceCallback.bind(this), name + ".fragment");
+            //fileReader(vertexFilePath, this.sourceCallback.bind(this), name + ".vertex");
+            //fileReader(fragmentFilePath, this.sourceCallback.bind(this), name + ".fragment");
             this._shaderSources[name] = {}
         }
 

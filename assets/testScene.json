@@ -1,0 +1,26 @@
+{
+    "name": "testScene",
+    "gameObjects": [
+        {
+            "name": "testObject",
+            "enabled": true,
+            "transform": {
+                "position": {
+                    "x": 3,
+                    "y": 1
+                },
+                "rotation": 3.14159,
+                "scale": {
+                    "x": 1,
+                    "y": 2
+                } 
+            },
+            "components": [
+                {
+                    "type": "SpriteRenderer",
+                    "texture": "spritesExamples/rectangle.png"
+                }
+            ]
+        }
+    ]
+}

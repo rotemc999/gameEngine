@@ -2,10 +2,12 @@ namespace GE {
     export class Scene {
 
         private _gameObjects: GameObject[] = [];
+        private _camera: MainCamera;
         private _name: string;
 
         public constructor(name: string) {
             this._name = name;
+            this._camera = new MainCamera("__MainCamera__", this);
         }
 
         public get name(): string {
@@ -22,14 +24,8 @@ namespace GE {
                 if (this._gameObjects[i].name === name) {
                     return this._gameObjects[i];
                 }
-                else {
-                    let gameObject: GameObject = this._gameObjects[i].find(name) as GameObject;
-                    if (!gameObject === undefined) {
-                        return gameObject;
-                    }
-                }
-                return undefined;
             }
+            return undefined;
         }
 
         public removeGameObject(gameObject: GameObject): void {
@@ -63,6 +59,10 @@ namespace GE {
         }
         public onDeactivate(): void {
 
+        }
+
+        public get camera(): MainCamera{
+            return this._camera;
         }
     }
 }

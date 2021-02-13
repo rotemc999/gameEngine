@@ -55,7 +55,7 @@ namespace GE {
             gl.uniform2fv(positionPosition, this.transfrom.position.toArray());
 
             let rotationMatPosition: WebGLUniformLocation = shader.getUniformLocation("rotation");
-            gl.uniformMatrix2fv(rotationMatPosition, false, Matrix2.rotation(this.transfrom.rotation).data);
+            gl.uniformMatrix2fv(rotationMatPosition, false, Matrix2x2.rotation(this.transfrom.rotation).data);
 
             let scalePosition: WebGLUniformLocation = shader.getUniformLocation("scale");
             gl.uniform2fv(scalePosition, this.transfrom.scale.toArray());

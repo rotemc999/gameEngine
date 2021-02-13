@@ -7,6 +7,7 @@ namespace GE {
         private _targetBufferType: number;
         private _mode: number;
         private _typeSize: number;
+        private _dataIncome: number;
 
         private _data: number[] = [];
         private _attributes: AttributeInfo[] = [];
@@ -17,9 +18,11 @@ namespace GE {
          * @param dataType the type of each element in this buffer
          * @param targetBufferType the type of the buffer
          * @param mode the drawing mode of the buffer
+         * @param dataIncome the data income frequency.
          */
-        public constructor(elementSize: number, dataType: number = gl.FLOAT, targetBufferType: number = gl.ARRAY_BUFFER, mode: number = gl.TRIANGLES) {
+        public constructor(elementSize: number, dataIncome: number = gl.STATIC_DRAW, dataType: number = gl.FLOAT, targetBufferType: number = gl.ARRAY_BUFFER, mode: number = gl.TRIANGLES) {
             this._elementSize = elementSize;
+            this._dataIncome = dataIncome;
             this._dataType = dataType;
             this._targetBufferType = targetBufferType;
             this._mode = mode;
@@ -115,7 +118,7 @@ namespace GE {
                     break;
             }
 
-            gl.bufferData(this._targetBufferType, bufferData, gl.STATIC_DRAW);
+            gl.bufferData(this._targetBufferType, bufferData, this._dataIncome);
         }
 
         public draw(): void {
@@ -125,6 +128,7 @@ namespace GE {
             else if (this._targetBufferType === gl.ELEMENT_ARRAY_BUFFER) {
                 gl.drawElements(this._mode, this._data.length, this._dataType, 0);
             }
+            
         }
     }
 

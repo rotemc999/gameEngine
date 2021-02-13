@@ -3,12 +3,14 @@ namespace GE {
      * The WebGL canvas context.
      */
     export var gl: WebGLRenderingContext;
+    export var canvas: HTMLCanvasElement;
+
     export class GLUtilties {
         /**
          * Initializing WebGL.
          */
-        public static initialize(): HTMLCanvasElement {
-            let canvas: HTMLCanvasElement = document.getElementById("canvas") as HTMLCanvasElement;
+        public static start() {
+            canvas = document.getElementById("canvas") as HTMLCanvasElement;
             if (canvas === undefined) {
                 throw new Error("Cannot find canvas");
             }
@@ -21,8 +23,6 @@ namespace GE {
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
             this.checkConstChanges();
-
-            return canvas;
 
 
 
