@@ -1,0 +1,13 @@
+{
+    "texture": "spritesExamples/rectangle.png",
+    "uv": [
+        {
+            "u": 0,
+            "v": 0
+        },
+        {
+            "u": 1,
+            "v": 1
+        }
+    ]
+}

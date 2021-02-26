@@ -6,6 +6,8 @@ namespace GE {
     export var canvas: HTMLCanvasElement;
 
     export class GLUtilties {
+
+        private static _maxTextures: number;
         /**
          * Initializing WebGL.
          */
@@ -18,23 +20,15 @@ namespace GE {
             if (gl === undefined) {
                 throw new Error("Unable to initialize WebGL");
             }
+            this._maxTextures = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS)
+
             gl.enable(gl.BLEND);
             //gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-
-            this.checkConstChanges();
-
-
-
         }
 
-        private static checkConstChanges(): void {
-            if (gl.LINEAR != Mipmap.linear) {
-                console.log("linear mipmap number updated to: " + gl.LINEAR)
-            }
-            if (gl.NEAREST != Mipmap.nearest) {
-                console.log("linear mipmap number updated to: " + gl.NEAREST)
-            }
+        public static get maxTextures(): number{
+            return this._maxTextures;
         }
     }
 

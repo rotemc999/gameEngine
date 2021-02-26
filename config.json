@@ -1,0 +1,20 @@
+{
+    "firstScene": "./assets/testScene.json",
+    "audio": {
+        "volume": 100,
+        "categories": [
+            {
+                "name": "music",
+                "volume": 100
+            }
+        ],
+        "audio": []
+    },
+    "renderer": {
+        "mipmap": "auto",
+        "sprites": [
+            "assets/testSprite.json",
+            "assets/rectangle.json"
+        ]
+    }
+}

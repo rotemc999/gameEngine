@@ -1,39 +1,57 @@
 namespace GE{
 
-    const maxQuads = 10000;
+    export const batchMaxQuads = 10000;
 
-    interface batchData{
+    export interface BatchData{
         gameObject: GameObject; 
-        vertexPositions: Vector2[];
-        uvCoordinates: Vector2[];
+        sprite: Sprite;
         color: Color;
+        id: number;
     }
 
 
     export class Batch{
         private _vertexBuffer: GLBuffer;
         private _indeciesBuffer: GLBuffer;
-        private _data: batchData[] = [];
-        //vertex: vertexPosition(x,y), u,v, position(x,y), rotation, scale(x,y), color(r,g,b,a), textureIndex
+        private _data: BatchData[] = [];
+        private _textures: Texture[] = [];
         public constructor(){
-
-        }
-
-        public start(){
             this._vertexBuffer = new GLBuffer(12, gl.DYNAMIC_DRAW);
             this._vertexBuffer.bind();
 
             this._indeciesBuffer = new GLBuffer(4, gl.STATIC_DRAW, gl.UNSIGNED_INT, gl.ELEMENT_ARRAY_BUFFER);
             this._indeciesBuffer.pushData(this.generateIndecies());
-
-            
         }
 
+        public add(data: BatchData){
+            if(this._data.length < batchMaxQuads){
+                for(let i = 0; i < this._textures.length; i++){
+                    if(this._textures[i] == data.sprite.texture){
+                        this._data.push(data);
+                        return;
+                    }
+                }
+                if(this._textures.length < GLUtilties.maxTextures){
+                    this._textures.push(data.sprite.texture);
+                    this._data.push(data);
+                }
+            }
+        }
+
+        public remove(id: number){
+            this._data.slice(id, 1);
+        }
+
+        public modify(id: number, color: Color): void{
+            this._data[id].color = color;
+        }
+
+
         private generateIndecies(): number[]{
-            let elements: number[] = new Array(maxQuads * 6);
+            let elements: number[] = new Array(batchMaxQuads * 6);
             
 
-            for(let i = 0; i < maxQuads; i++){
+            for(let i = 0; i < batchMaxQuads; i++){
                 // 6 cause in 1 quad there are 6 indecies
                 let indexOffset: number = i * 6;
                 // 4 cause in 1 quad there are 4 vertecies 
@@ -51,10 +69,32 @@ namespace GE{
             }
 
             return elements;
-        }
+        }   
 
         public render(){
             
-        }   
+        }
+
+
+        
+        public hasQuadRoom(): boolean{
+            return this._data.length < batchMaxQuads;
+        }
+
+        public canRenderSprite(sprite: Sprite): boolean{
+            for(let i = 0; i < this._textures.length; i++){
+                if(this._textures[i] == sprite.texture){
+                    return true;
+                }
+            }
+            if(this._textures.length < GLUtilties.maxTextures){
+                return true;
+            }
+            return false;
+        }
+
+        public get numberOfQuads(): number{
+            return this._data.length;
+        }
     }
 }

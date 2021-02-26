@@ -4,23 +4,85 @@ namespace GE {
         public canvas: HTMLCanvasElement;
 
         private _shader: Shader;
-        private _gameObjects: GameObject[] = [];
-        private _projection: Matrix2x2;
+
+        private _unloadedAssestsNum: number = 0;
 
         private _fpsLabel: HTMLHeadingElement = document.getElementById("fpsLabel") as HTMLHeadingElement;
         public constructor() {
         }
 
-        public start(): void {
+        public load(): void{
+            // load the images and the spritesheet files
+            let configFile: FileReader = new FileReader("config.json", "configFile");
+            configFile.onload = (configFile: FileReader)=>{
+                let configData = Json.load(configFile.data);
+
+                AssetManager.putAssetData("__config__", configData);
+
+                //loading the first scene data
+                let firstSceneFile: FileReader = new FileReader(configData.firstScene, "firstSceneFile");
+                this._unloadedAssestsNum++;
+                firstSceneFile.onload = (firstSceneFile: FileReader)=>{
+                    let firstSceneData = Json.load(firstSceneFile.data);
+                    AssetManager.putAssetData(configData.firstScene, firstSceneData);
+                    
+                    this._unloadedAssestsNum--;
+                };
+
+                //loading renderer data
+                //Renderer.mipmap = Mipmap[configData.renderer.mipmap] as Mipmap;
+                //loading renderer sprite sheets data
+                for(let spritePath in configData.renderer.sprites){
+                    let spriteFile: FileReader = new FileReader(configData.renderer.sprites[spritePath],configData.renderer.sprites[spritePath]);
+                    this._unloadedAssestsNum++;
+                    spriteFile.onload = (spriteFile: FileReader)=>{
+                        let spriteData = Json.load(spriteFile.data);    
+                        let spriteImage = new Image();
+                        spriteImage.src = spriteData.texture;
+                        spriteImage.onload = ()=>{
+                            AssetManager.putAssetData(spriteData.texture , spriteImage);
+                            this.isFinishLoading();
+                            this._unloadedAssestsNum--;
+                        };
+                        AssetManager.putAssetData(spriteFile.name , spriteData);
+                    };
+                }
+
+                //loading audio data
+                AudioManager.volume = configData.audio.volume;
+                // loading audio file data
+                for(let audioPath in configData.audio.audio){
+                    let audio = new Audio(audioPath);
+                    this._unloadedAssestsNum++;
+                    audio.onload = (e)=>{
+                        AssetManager.putAssetData(audio.src, audio);
+                        this.isFinishLoading();
+                        this._unloadedAssestsNum--;
+                    };
+                }
+
+            };
+        }
+
+        private start(): void{
+            console.log("start");
             GLUtilties.start();
             gl.clearColor(0, 0, 0, 1);
             this.loadTextureShaders();
             this._shader.use();
 
+            Renderer.start();
+
+            AssetManager.start();
+
             AudioManager.start();
 
             Input.start();
 
+            let scene = SceneManager.loadSceneJson(AssetManager.getAssetData("__config__").firstScene);
+            SceneManager.activateScene(scene.name);
+
+            /*
             let scene = new Scene("scene");
 
             SceneManager.createScene(scene);
@@ -30,16 +92,17 @@ namespace GE {
             testGameObject.transform.position = new Vector2(10,0);
             scene.addGameObject(testGameObject);
 
-            let spriteRenderer = new SpriteRenderer("spriteRenderer", testGameObject);
+            let spriteRenderer = new SSpriteRenderer("spriteRenderer", testGameObject);
             spriteRenderer.texture = "spritesExamples/circle.png";
             testGameObject.addComponent(spriteRenderer);
-
+            */
             this.resize();
-
 
             SceneManager.start();
 
             requestAnimationFrame(this.update.bind(this));
+
+            Renderer.render();
         }
 
         private update() {
@@ -47,13 +110,7 @@ namespace GE {
             this._fpsLabel.innerHTML = "fps: " + Time.frameRate;
             gl.clear(gl.COLOR_BUFFER_BIT);
 
-            
             this._shader.use();
-
-            let speed: number = 5;
-            let rotationSpeed: number = 210;
-
-            
 
             let projectionPosition: WebGLUniformLocation = this._shader.getUniformLocation("projection");
             gl.uniformMatrix2fv(projectionPosition, false, new Float32Array(SceneManager.activeScene.camera.projection.data));
@@ -117,6 +174,12 @@ namespace GE {
             `;
 
             this._shader = new Shader("basic", vertex, fragment);
+        }
+
+        private isFinishLoading(): void{
+            if(this._unloadedAssestsNum <= 1){
+                this.start();
+            }
         }
     }
 }

@@ -11,29 +11,23 @@ namespace GE {
             this._scenes.push(scene);
         }
 
-        public static loadScene(path:string): void{
-            let sceneFile: FileReader = new FileReader(path, "scene");
-            sceneFile.onload = (e?: FileReader)=>{
-                let sceneData = Json.load(sceneFile.data);
+        public static loadSceneJson(path:string): Scene{
+            let sceneData = AssetManager.getAssetData(path);
 
-                if (sceneData.name === undefined){
-                    throw new Error("Scene file format exception: Scene name is not defined.");
-                }
-                
-                let scene: Scene = new Scene(String(sceneData.name));
-
-                if (sceneData.gameObjects !== undefined){
-
-                    for(let i = 0; i < sceneData.gameObjects.length; i++){
-                        scene.addGameObject(this.loadGameObject(sceneData.gameObjects[i], scene))
-                    }
-                }
-                
-                console.log(scene);
-                this._scenes.push(scene);
-                scene.start();
-                
+            if (sceneData.name === undefined){
+                throw new Error("Scene file format exception: Scene name is not defined.");
             }
+            
+            let scene: Scene = new Scene(String(sceneData.name));
+
+            if (sceneData.gameObjects !== undefined){
+
+                for(let i = 0; i < sceneData.gameObjects.length; i++){
+                    scene.addGameObject(this.loadGameObject(sceneData.gameObjects[i], scene))
+                }
+            }
+            this._scenes.push(scene);
+            return scene
         }
 
         private static loadGameObject(data:any, scene:Scene):GameObject{
@@ -80,7 +74,7 @@ namespace GE {
                             continue;
                         }
                         if(!(param in component)){
-                            throw new Error("Scene file format exception: Component parameter named '"+param+"' is not exist.");
+                            throw new Error("Scene file format exception: Component parameter named '"+param+"' does not exist.");
                         }
                         component[param] = data.components[i][param];
                     }

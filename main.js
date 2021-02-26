@@ -4,36 +4,91 @@ var GE;
     class Engine {
         constructor() {
             this.run = true;
-            this._gameObjects = [];
+            this._unloadedAssestsNum = 0;
             this._fpsLabel = document.getElementById("fpsLabel");
         }
+        load() {
+            // load the images and the spritesheet files
+            let configFile = new GE.FileReader("config.json", "configFile");
+            configFile.onload = (configFile) => {
+                let configData = GE.Json.load(configFile.data);
+                GE.AssetManager.putAssetData("__config__", configData);
+                //loading the first scene data
+                let firstSceneFile = new GE.FileReader(configData.firstScene, "firstSceneFile");
+                this._unloadedAssestsNum++;
+                firstSceneFile.onload = (firstSceneFile) => {
+                    let firstSceneData = GE.Json.load(firstSceneFile.data);
+                    GE.AssetManager.putAssetData(configData.firstScene, firstSceneData);
+                    this._unloadedAssestsNum--;
+                };
+                //loading renderer data
+                //Renderer.mipmap = Mipmap[configData.renderer.mipmap] as Mipmap;
+                //loading renderer sprite sheets data
+                for (let spritePath in configData.renderer.sprites) {
+                    let spriteFile = new GE.FileReader(configData.renderer.sprites[spritePath], configData.renderer.sprites[spritePath]);
+                    this._unloadedAssestsNum++;
+                    spriteFile.onload = (spriteFile) => {
+                        let spriteData = GE.Json.load(spriteFile.data);
+                        let spriteImage = new Image();
+                        spriteImage.src = spriteData.texture;
+                        spriteImage.onload = () => {
+                            GE.AssetManager.putAssetData(spriteData.texture, spriteImage);
+                            this.isFinishLoading();
+                            this._unloadedAssestsNum--;
+                        };
+                        GE.AssetManager.putAssetData(spriteFile.name, spriteData);
+                    };
+                }
+                //loading audio data
+                GE.AudioManager.volume = configData.audio.volume;
+                // loading audio file data
+                for (let audioPath in configData.audio.audio) {
+                    let audio = new Audio(audioPath);
+                    this._unloadedAssestsNum++;
+                    audio.onload = (e) => {
+                        GE.AssetManager.putAssetData(audio.src, audio);
+                        this.isFinishLoading();
+                        this._unloadedAssestsNum--;
+                    };
+                }
+            };
+        }
         start() {
+            console.log("start");
             GE.GLUtilties.start();
             GE.gl.clearColor(0, 0, 0, 1);
             this.loadTextureShaders();
             this._shader.use();
+            GE.Renderer.start();
+            GE.AssetManager.start();
             GE.AudioManager.start();
             GE.Input.start();
-            let scene = new GE.Scene("scene");
-            GE.SceneManager.createScene(scene);
-            GE.SceneManager.activateScene("scene");
-            let testGameObject = new GE.GameObject("testing game object", scene);
-            testGameObject.transform.position = new GE.Vector2(10, 0);
+            let scene = GE.SceneManager.loadSceneJson(GE.AssetManager.getAssetData("__config__").firstScene);
+            GE.SceneManager.activateScene(scene.name);
+            /*
+            let scene = new Scene("scene");
+
+            SceneManager.createScene(scene);
+            SceneManager.activateScene("scene");
+
+            let testGameObject = new GameObject("testing game object", scene);
+            testGameObject.transform.position = new Vector2(10,0);
             scene.addGameObject(testGameObject);
-            let spriteRenderer = new GE.SpriteRenderer("spriteRenderer", testGameObject);
+
+            let spriteRenderer = new SSpriteRenderer("spriteRenderer", testGameObject);
             spriteRenderer.texture = "spritesExamples/circle.png";
             testGameObject.addComponent(spriteRenderer);
+            */
             this.resize();
             GE.SceneManager.start();
             requestAnimationFrame(this.update.bind(this));
+            GE.Renderer.render();
         }
         update() {
             GE.SceneManager.activateScene("testScene");
             this._fpsLabel.innerHTML = "fps: " + GE.Time.frameRate;
             GE.gl.clear(GE.gl.COLOR_BUFFER_BIT);
             this._shader.use();
-            let speed = 5;
-            let rotationSpeed = 210;
             let projectionPosition = this._shader.getUniformLocation("projection");
             GE.gl.uniformMatrix2fv(projectionPosition, false, new Float32Array(GE.SceneManager.activeScene.camera.projection.data));
             GE.SceneManager.update();
@@ -92,6 +147,11 @@ var GE;
             `;
             this._shader = new GE.Shader("basic", vertex, fragment);
         }
+        isFinishLoading() {
+            if (this._unloadedAssestsNum <= 1) {
+                this.start();
+            }
+        }
     }
     GE.Engine = Engine;
 })(GE || (GE = {}));
@@ -99,7 +159,8 @@ var GE;
 var engine;
 window.onload = () => {
     engine = new GE.Engine();
-    engine.start();
+    engine.load();
+    //engine.start();
 };
 window.onresize = () => {
     engine.resize();
@@ -279,6 +340,23 @@ var GE;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
+    class AssetManager {
+        constructor() { }
+        static start() {
+        }
+        static update() { }
+        static putAssetData(path, data) {
+            this._assets[path] = data;
+        }
+        static getAssetData(name) {
+            return this._assets[name];
+        }
+    }
+    AssetManager._assets = {};
+    GE.AssetManager = AssetManager;
+})(GE || (GE = {}));
+var GE;
+(function (GE) {
     class FileReader {
         constructor(path, name) {
             this._onload = (filereader) => { };
@@ -451,11 +529,11 @@ var GE;
 /// <reference path="../gameObject/component.ts"/>
 var GE;
 (function (GE) {
-    class SpriteRenderer extends GE.Component {
+    class SSpriteRenderer extends GE.Component {
         constructor() {
             super(...arguments);
-            this._texture = new GE.Texture("spritesExamples/rectangle.png", GE.Mipmap.linear, 0);
-            this.color = new GE.Color(255, 255, 255, 255);
+            this._texture = new GE.Texture("spritesExamples/rectangle.png");
+            this.color = GE.Color.white();
         }
         start() {
             //this._texture = new Texture("spritesExamples/rectangle.png", Mipmap.linear, 0);
@@ -489,7 +567,9 @@ var GE;
          * render
          */
         render(shader) {
-            this._texture.bind();
+            this._buffer.bind();
+            this._texture.bind(0);
+            //this._buffer.bind();
             let tintPosition = shader.getUniformLocation("tint");
             GE.gl.uniform4fv(tintPosition, this.color.toArray());
             let positionPosition = shader.getUniformLocation("position");
@@ -498,12 +578,38 @@ var GE;
             GE.gl.uniformMatrix2fv(rotationMatPosition, false, GE.Matrix2x2.rotation(this.transfrom.rotation).data);
             let scalePosition = shader.getUniformLocation("scale");
             GE.gl.uniform2fv(scalePosition, this.transfrom.scale.toArray());
+            //console.log(this.transfrom.scale.toArray());
             GE.gl.uniform1i(shader.getUniformLocation("texture"), 0);
-            this._buffer.bind();
+            //this._buffer.bind();
             this._buffer.draw();
         }
         set texture(path) {
-            this._texture = new GE.Texture(path, GE.Mipmap.linear, 0);
+            this._texture = new GE.Texture(path);
+        }
+    }
+    GE.SSpriteRenderer = SSpriteRenderer;
+})(GE || (GE = {}));
+var GE;
+(function (GE) {
+    class SpriteRenderer extends GE.Component {
+        constructor() {
+            super(...arguments);
+            this._color = GE.Color.white();
+        }
+        start() {
+        }
+        update() {
+        }
+        set sprite(path) {
+            this._sprite = path;
+            if (!this._batchDataId === undefined) {
+                GE.Renderer.remove(this._batchDataId);
+            }
+            let data = GE.Renderer.add(path, this.gameObject, this._color);
+            this._batchDataId = data.id;
+        }
+        get sprite() {
+            return this._sprite;
         }
     }
     GE.SpriteRenderer = SpriteRenderer;
@@ -740,18 +846,13 @@ var GE;
             if (GE.gl === undefined) {
                 throw new Error("Unable to initialize WebGL");
             }
+            this._maxTextures = GE.gl.getParameter(GE.gl.MAX_TEXTURE_IMAGE_UNITS);
             GE.gl.enable(GE.gl.BLEND);
             //gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
             GE.gl.blendFunc(GE.gl.SRC_ALPHA, GE.gl.ONE_MINUS_SRC_ALPHA);
-            this.checkConstChanges();
         }
-        static checkConstChanges() {
-            if (GE.gl.LINEAR != GE.Mipmap.linear) {
-                console.log("linear mipmap number updated to: " + GE.gl.LINEAR);
-            }
-            if (GE.gl.NEAREST != GE.Mipmap.nearest) {
-                console.log("linear mipmap number updated to: " + GE.gl.NEAREST);
-            }
+        static get maxTextures() {
+            return this._maxTextures;
         }
     }
     GE.GLUtilties = GLUtilties;
@@ -829,55 +930,87 @@ var GE;
 var GE;
 (function (GE) {
     class Texture {
-        constructor(imageSrc, mipmap, textureSlot) {
-            this._textureSlot = textureSlot;
+        constructor(image, mipmap = GE.Mipmap.auto) {
+            this._mipmap = mipmap;
             this._texture = GE.gl.createTexture();
-            this._image = new Image();
-            this._image.onload = (e) => {
-                GE.gl.bindTexture(GE.gl.TEXTURE_2D, this._texture);
-                GE.gl.texImage2D(GE.gl.TEXTURE_2D, 0, GE.gl.RGBA, GE.gl.RGBA, GE.gl.UNSIGNED_BYTE, this._image);
-                GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_WRAP_S, GE.gl.CLAMP_TO_EDGE);
-                GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_WRAP_T, GE.gl.CLAMP_TO_EDGE);
-                GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MAG_FILTER, mipmap);
-                GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MIN_FILTER, mipmap);
-            };
-            this._image.src = imageSrc;
-            GE.gl.activeTexture(GE.gl.TEXTURE0 + this._textureSlot);
-            GE.gl.bindTexture(GE.gl.TEXTURE_2D, this._texture);
+            if (typeof image === "string") {
+                this._image = new Image();
+                this._image.onload = (e) => {
+                    this.setup();
+                };
+                this._image.src = image;
+            }
+            else {
+                this._image = image;
+                this.setup();
+            }
+            //gl.activeTexture(gl.TEXTURE0 + this._textureSlot);
+            //gl.bindTexture(gl.TEXTURE_2D, this._texture);
         }
-        bind() {
-            GE.gl.activeTexture(GE.gl.TEXTURE0 + this._textureSlot);
+        bind(textureSlot) {
             GE.gl.bindTexture(GE.gl.TEXTURE_2D, this._texture);
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MAG_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MIN_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
+            GE.gl.activeTexture(GE.gl.TEXTURE0 + textureSlot);
         }
         destroy() {
             GE.gl.deleteTexture(this._texture);
         }
+        size() {
+            return new GE.Vector2(this._image.width, this._image.height);
+        }
+        get mipmap() {
+            return this._mipmap;
+        }
+        set mipmap(mipmap) {
+            this._mipmap = mipmap;
+        }
+        setup() {
+            GE.gl.bindTexture(GE.gl.TEXTURE_2D, this._texture);
+            GE.gl.texImage2D(GE.gl.TEXTURE_2D, 0, GE.gl.RGBA, GE.gl.RGBA, GE.gl.UNSIGNED_BYTE, this._image);
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_WRAP_S, GE.gl.CLAMP_TO_EDGE);
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_WRAP_T, GE.gl.CLAMP_TO_EDGE);
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MAG_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MIN_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
+        }
     }
     GE.Texture = Texture;
-    let Mipmap;
-    (function (Mipmap) {
-        Mipmap[Mipmap["nearest"] = 9728] = "nearest";
-        Mipmap[Mipmap["linear"] = 9729] = "linear";
-    })(Mipmap = GE.Mipmap || (GE.Mipmap = {}));
-    ;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
-    const maxQuads = 10000;
+    GE.batchMaxQuads = 10000;
     class Batch {
-        //vertex: vertexPosition(x,y), u,v, position(x,y), rotation, scale(x,y), color(r,g,b,a), textureIndex
         constructor() {
             this._data = [];
-        }
-        start() {
+            this._textures = [];
             this._vertexBuffer = new GE.GLBuffer(12, GE.gl.DYNAMIC_DRAW);
             this._vertexBuffer.bind();
             this._indeciesBuffer = new GE.GLBuffer(4, GE.gl.STATIC_DRAW, GE.gl.UNSIGNED_INT, GE.gl.ELEMENT_ARRAY_BUFFER);
             this._indeciesBuffer.pushData(this.generateIndecies());
         }
+        add(data) {
+            if (this._data.length < GE.batchMaxQuads) {
+                for (let i = 0; i < this._textures.length; i++) {
+                    if (this._textures[i] == data.sprite.texture) {
+                        this._data.push(data);
+                        return;
+                    }
+                }
+                if (this._textures.length < GE.GLUtilties.maxTextures) {
+                    this._textures.push(data.sprite.texture);
+                    this._data.push(data);
+                }
+            }
+        }
+        remove(id) {
+            this._data.slice(id, 1);
+        }
+        modify(id, color) {
+            this._data[id].color = color;
+        }
         generateIndecies() {
-            let elements = new GE.Array(maxQuads * 6);
-            for (let i = 0; i < maxQuads; i++) {
+            let elements = new GE.Array(GE.batchMaxQuads * 6);
+            for (let i = 0; i < GE.batchMaxQuads; i++) {
                 // 6 cause in 1 quad there are 6 indecies
                 let indexOffset = i * 6;
                 // 4 cause in 1 quad there are 4 vertecies 
@@ -895,23 +1028,138 @@ var GE;
         }
         render() {
         }
+        hasQuadRoom() {
+            return this._data.length < GE.batchMaxQuads;
+        }
+        canRenderSprite(sprite) {
+            for (let i = 0; i < this._textures.length; i++) {
+                if (this._textures[i] == sprite.texture) {
+                    return true;
+                }
+            }
+            if (this._textures.length < GE.GLUtilties.maxTextures) {
+                return true;
+            }
+            return false;
+        }
+        get numberOfQuads() {
+            return this._data.length;
+        }
     }
     GE.Batch = Batch;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
-    const maxBatchQuads = 10000;
-    //const maxTextures = gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS);
     class Renderer {
-        constructor() {
-            this._batches = [];
+        constructor() { }
+        static start() {
+            this._batches = [new GE.Batch()];
         }
-        add() {
+        static add(spritePath, gameObject, color) {
+            for (let i = 0; i < this._batches.length; i++) {
+                if (this._batches[i].hasQuadRoom() && this._batches[i].canRenderSprite(this._sprites[spritePath])) {
+                    let id = i * GE.batchMaxQuads + this._batches[i].numberOfQuads;
+                    let data = {
+                        sprite: this.getSprite(spritePath),
+                        gameObject: gameObject,
+                        color: color,
+                        id: id
+                    };
+                    this._batches[i].add(data);
+                    return data;
+                }
+            }
+            this._batches.push(new GE.Batch());
+            let id = (this._batches.length - 1) * GE.batchMaxQuads + this._batches[-1].numberOfQuads;
+            let data = {
+                sprite: this._sprites[spritePath],
+                gameObject: gameObject,
+                color: color,
+                id: id
+            };
+            this._batches[-1].add(data);
+            this._quads++;
+            return data;
         }
-        render() {
+        static remove(id) {
+            this._batches[Math.floor(id / GE.batchMaxQuads)].remove(id % GE.batchMaxQuads);
+            this._quads--;
+        }
+        static render() {
+            console.log(this._sprites);
+            console.log(this._batches);
+        }
+        static getSprite(path) {
+            // getting already loaded sprite
+            if (path in this._sprites) {
+                return this._sprites[path];
+            }
+            // if the sprite doesnt exits it will try to create a new one from the assets data
+            let spriteData = GE.AssetManager.getAssetData(path);
+            if (spriteData === undefined) {
+                throw new Error("the sprite sheet '" + path + "' was not found in the imported files");
+            }
+            let uv = [
+                new GE.Vector2(0, 0),
+                new GE.Vector2(1, 1)
+            ];
+            if (spriteData.texture in this._textures) {
+                let sprite = new GE.Sprite(this._textures[spriteData.texture], uv);
+                this._sprites[path] = sprite;
+                return sprite;
+            }
+            else {
+                let textureImg = GE.AssetManager.getAssetData(spriteData.texture);
+                if (!(textureImg === undefined)) {
+                    let texture = new GE.Texture(textureImg);
+                    this._textures[spriteData.texture] = texture;
+                    let sprite = new GE.Sprite(texture, uv);
+                    this._sprites[path] = sprite;
+                    return sprite;
+                }
+                throw new Error("the sprite sheet's image '" + spriteData.texture + "' was not found in the imported files");
+            }
+        }
+        static getMipmapGlNumber(mipmap) {
+            if (mipmap === Mipmap.linear) {
+                return GE.gl.LINEAR;
+            }
+            else if (mipmap === Mipmap.nearest) {
+                return GE.gl.NEAREST;
+            }
+            else {
+                // if it no one of the other that mean it is auto
+                if (this.mipmap === Mipmap.linear) {
+                    return GE.gl.LINEAR;
+                }
+                else if (this.mipmap === Mipmap.nearest) {
+                    return GE.gl.NEAREST;
+                }
+                else {
+                    if (GE.Time.frameRate > 55) {
+                        return GE.gl.LINEAR;
+                    }
+                    else {
+                        return GE.gl.NEAREST;
+                    }
+                }
+            }
+        }
+        static modify(id, data) {
+            this._batches[Math.floor(id / GE.batchMaxQuads)].modify(id % GE.batchMaxQuads, data);
         }
     }
+    Renderer._textures = {};
+    Renderer._sprites = {};
+    Renderer._quads = 0;
     GE.Renderer = Renderer;
+    let Mipmap;
+    (function (Mipmap) {
+        Mipmap[Mipmap["nearest"] = 0] = "nearest";
+        Mipmap[Mipmap["linear"] = 1] = "linear";
+        Mipmap[Mipmap["auto"] = 2] = "auto";
+    })(Mipmap = GE.Mipmap || (GE.Mipmap = {}));
+    ;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
@@ -1025,43 +1273,15 @@ var GE;
 var GE;
 (function (GE) {
     class Sprite {
-        constructor(src, name, width, height) {
-            this._name = name;
-            this._scale = new GE.Vector2(width, height);
-            this._texture = new GE.Texture(src, GE.Mipmap.linear, 0);
+        constructor(texture, uv) {
+            this._uv = [];
+            this._texture = texture;
         }
-        load() {
-            let vertecies = [
-                -0.5, -0.5, 0, 0,
-                0.5, -0.5, 1, 0,
-                -0.5, 0.5, 0, 1,
-                0.5, 0.5, 1, 1,
-                0.5, -0.5, 1, 0,
-                -0.5, 0.5, 0, 1
-            ];
-            this._buffer = new GE.GLBuffer(3);
-            let positionAttribute = new GE.AttributeInfo();
-            positionAttribute.location = 0;
-            positionAttribute.offset = 0;
-            positionAttribute.size = 2;
-            positionAttribute.stride = 4;
-            this._buffer.addAttribute(positionAttribute);
-            let uvAttribute = new GE.AttributeInfo();
-            uvAttribute.location = 1;
-            uvAttribute.offset = 2;
-            uvAttribute.size = 2;
-            uvAttribute.stride = 4;
-            this._buffer.addAttribute(uvAttribute);
-            this._buffer.pushData(vertecies);
-            this._buffer.upload();
-            this._buffer.unbind();
+        get uv() {
+            return this._uv;
         }
-        /**
-         * render
-         */
-        draw() {
-            this._buffer.bind();
-            this._buffer.draw();
+        get texture() {
+            return this._texture;
         }
     }
     GE.Sprite = Sprite;
@@ -1358,6 +1578,78 @@ var GE;
     keyCodes.CONTROL_RIGHT = [17, 2];
     GE.keyCodes = keyCodes;
 })(GE || (GE = {}));
+const keyCodes = {
+    "Escape": 27,
+    "F1": 112,
+    "F2": 113,
+    "F3": 114,
+    "F4": 115,
+    "F5": 116,
+    "F6": 117,
+    "F7": 118,
+    "F8": 119,
+    "F9": 120,
+    "F10": 121,
+    "F11": 122,
+    "F12": 123,
+    "`": 192,
+    "0": 48,
+    "1": 49,
+    "2": 50,
+    "3": 51,
+    "4": 52,
+    "5": 53,
+    "6": 54,
+    "7": 55,
+    "8": 56,
+    "9": 57,
+    "-": 189,
+    "=": 187,
+    "Backspace": 8,
+    "Tab": 9,
+    "q": 81,
+    "w": 87,
+    "e": 69,
+    "r": 82,
+    "t": 84,
+    "y": 89,
+    "u": 85,
+    "i": 73,
+    "o": 79,
+    "p": 80,
+    "[": 219,
+    "]": 221,
+    "Enter": 13,
+    "CapsLock": 20,
+    "a": 65,
+    "s": 83,
+    "d": 68,
+    "f": 70,
+    "g": 71,
+    "h": 72,
+    "j": 74,
+    "k": 75,
+    "l": 76,
+    ";": 186,
+    "'": 222,
+    "\\": 220,
+    "Shift": 16,
+    "Intl\\": 226,
+    "z": 90,
+    "x": 88,
+    "c": 67,
+    "v": 86,
+    "b": 66,
+    "n": 78,
+    "m": 77,
+    ",": 188,
+    ".": 190,
+    "/": 191,
+    "Control": 17,
+    "Alt": 18,
+    " ": 32,
+    "ContextMenu": 93,
+};
 var GE;
 (function (GE) {
     function degRad(angle) {
@@ -1544,23 +1836,19 @@ var GE;
         static createScene(scene) {
             this._scenes.push(scene);
         }
-        static loadScene(path) {
-            let sceneFile = new GE.FileReader(path, "scene");
-            sceneFile.onload = (e) => {
-                let sceneData = GE.Json.load(sceneFile.data);
-                if (sceneData.name === undefined) {
-                    throw new Error("Scene file format exception: Scene name is not defined.");
+        static loadSceneJson(path) {
+            let sceneData = GE.AssetManager.getAssetData(path);
+            if (sceneData.name === undefined) {
+                throw new Error("Scene file format exception: Scene name is not defined.");
+            }
+            let scene = new GE.Scene(String(sceneData.name));
+            if (sceneData.gameObjects !== undefined) {
+                for (let i = 0; i < sceneData.gameObjects.length; i++) {
+                    scene.addGameObject(this.loadGameObject(sceneData.gameObjects[i], scene));
                 }
-                let scene = new GE.Scene(String(sceneData.name));
-                if (sceneData.gameObjects !== undefined) {
-                    for (let i = 0; i < sceneData.gameObjects.length; i++) {
-                        scene.addGameObject(this.loadGameObject(sceneData.gameObjects[i], scene));
-                    }
-                }
-                console.log(scene);
-                this._scenes.push(scene);
-                scene.start();
-            };
+            }
+            this._scenes.push(scene);
+            return scene;
         }
         static loadGameObject(data, scene) {
             if (data.name === undefined) {
@@ -1602,7 +1890,7 @@ var GE;
                             continue;
                         }
                         if (!(param in component)) {
-                            throw new Error("Scene file format exception: Component parameter named '" + param + "' is not exist.");
+                            throw new Error("Scene file format exception: Component parameter named '" + param + "' does not exist.");
                         }
                         component[param] = data.components[i][param];
                     }

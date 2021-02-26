@@ -3,7 +3,8 @@
 var engine: GE.Engine;
 window.onload = () => {
     engine = new GE.Engine();
-    engine.start();
+    engine.load();
+    //engine.start();
 };
 
 window.onresize = () => {
