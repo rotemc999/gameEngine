@@ -2,19 +2,24 @@
     "firstScene": "./assets/testScene.json",
     "audio": {
         "volume": 100,
-        "categories": [
-            {
-                "name": "music",
-                "volume": 100
-            }
-        ],
+        "categories": [{
+            "name": "music",
+            "volume": 100
+        }],
         "audio": []
     },
     "renderer": {
-        "mipmap": "auto",
+        "mipmap": "linear",
         "sprites": [
             "assets/testSprite.json",
-            "assets/rectangle.json"
+            "assets/rectangle.json",
+            "assets/circle.json",
+            "assets/crate.json",
+            "assets/dirt.json"
+        ],
+        "layers": [
+            "background",
+            "foreground"
         ]
     }
 }

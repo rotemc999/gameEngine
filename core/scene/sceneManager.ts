@@ -62,13 +62,20 @@ namespace GE {
                 }
             }
 
+            if(data.enabled !== undefined){
+                gameObject.enabled = data.enabled;
+            }
+            else{
+                gameObject.enabled = true;
+            }
+
             if(data.components !== undefined){
                 for(let i =0; i < data.components.length; i++){
                     let componentData = data.components[i]
                     if(componentData.type === undefined){
                         throw new Error("Scene file format exception: Component type is not defined.");
                     }
-                    let component = eval("new GE." + componentData.type + "('fggs', gameObject)");
+                    let component = eval("new GE." + componentData.type + "('"+componentData.type+"', gameObject)");
                     for (let param in data.components[i]){
                         if(param === "type"){
                             continue;
@@ -82,11 +89,7 @@ namespace GE {
                     gameObject.addComponent(component);
                 }   
             }
-
-            if (gameObject.enabled !== undefined){
-                gameObject.enabled = data["enabled"];
-            }
-            
+                
             
 
             return gameObject;
@@ -112,9 +115,6 @@ namespace GE {
 
         public static update(): void {
             this._activeScene.update();
-        }
-        public static render(shader: Shader): void {
-            this._activeScene.render(shader);
         }
 
         public static get activeScene(): Scene{

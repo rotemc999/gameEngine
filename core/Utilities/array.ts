@@ -7,36 +7,24 @@ namespace GE {
         public static isEmpty(array: any[]): boolean {
             return array.length < 1;
         }
-    }
-
-
-    export class Array extends window.Array{
-        public constructor(length?: number){
-            super(length);
-        }
-
-        public isEmpty(): boolean{
-            return super.length < 1;
-        }
-
-        public remove(index: number): void{
-            console.log(index);
-            console.log(super.slice(index, index + 1));
-            console.log(super.toString());
-        }
-
-        public removeEmptyStrings(): void{
-            let i = 0;
-            while (super.length > i){
-                if(super[i] === ""){
-                    this.remove(i);
-                }
-                else{
-                    i++;
+        public static removeEmptyStrings(stringArray: string[]): string[] {
+            let result: string[] = [];
+            for (let i = 0; i < stringArray.length; i++) {
+                if (!(stringArray[i] === "")) {
+                    result.push(stringArray[i]);
                 }
             }
+            return result;
+        }
+    
+        public static contains(array: any[], item: any): boolean {
+            return array.some(elem => {
+                return JSON.stringify(elem) === JSON.stringify(item);
+            });
+        }
+    
+        public static indexof(array: any[], item: any): number {
+            return array.findIndex(x => JSON.stringify(x) === JSON.stringify(item))
         }
     }
-
-
 }

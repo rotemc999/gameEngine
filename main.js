@@ -5,6 +5,7 @@ var GE;
         constructor() {
             this.run = true;
             this._unloadedAssestsNum = 0;
+            this._gameObjects = [];
             this._fpsLabel = document.getElementById("fpsLabel");
         }
         load() {
@@ -22,7 +23,18 @@ var GE;
                     this._unloadedAssestsNum--;
                 };
                 //loading renderer data
-                //Renderer.mipmap = Mipmap[configData.renderer.mipmap] as Mipmap;
+                if (configData.renderer.mipmap === "nearest") {
+                    GE.Renderer.mipmap = GE.Mipmap.nearest;
+                }
+                else if (configData.renderer.mipmap === "linear") {
+                    GE.Renderer.mipmap = GE.Mipmap.linear;
+                }
+                else if (configData.renderer.mipmap === "auto") {
+                    GE.Renderer.mipmap = GE.Mipmap.auto;
+                }
+                else {
+                    throw new Error("unknown mipmap type '" + configData.renderer.mipmap + "'");
+                }
                 //loading renderer sprite sheets data
                 for (let spritePath in configData.renderer.sprites) {
                     let spriteFile = new GE.FileReader(configData.renderer.sprites[spritePath], configData.renderer.sprites[spritePath]);
@@ -38,6 +50,10 @@ var GE;
                         };
                         GE.AssetManager.putAssetData(spriteFile.name, spriteData);
                     };
+                }
+                // load layers
+                for (let i = 0; i < configData.renderer.layers.length; i++) {
+                    GE.Renderer.addLayer(configData.renderer.layers[i], i);
                 }
                 //loading audio data
                 GE.AudioManager.volume = configData.audio.volume;
@@ -56,43 +72,67 @@ var GE;
         start() {
             console.log("start");
             GE.GLUtilties.start();
-            GE.gl.clearColor(0, 0, 0, 1);
             this.loadTextureShaders();
-            this._shader.use();
-            GE.Renderer.start();
+            //this._shader.use();
+            GE.Renderer.start(this._shader);
             GE.AssetManager.start();
             GE.AudioManager.start();
             GE.Input.start();
             let scene = GE.SceneManager.loadSceneJson(GE.AssetManager.getAssetData("__config__").firstScene);
             GE.SceneManager.activateScene(scene.name);
-            /*
-            let scene = new Scene("scene");
-
-            SceneManager.createScene(scene);
-            SceneManager.activateScene("scene");
-
-            let testGameObject = new GameObject("testing game object", scene);
-            testGameObject.transform.position = new Vector2(10,0);
-            scene.addGameObject(testGameObject);
-
-            let spriteRenderer = new SSpriteRenderer("spriteRenderer", testGameObject);
-            spriteRenderer.texture = "spritesExamples/circle.png";
-            testGameObject.addComponent(spriteRenderer);
-            */
             this.resize();
+            /*
+             for(let i = 0; i < 10000; i++){
+                 let gameObject = new GameObject("go", scene);
+                 gameObject.transform.position.x = i;
+                 let spriteRenderer = new SpriteRenderer("sr", gameObject);
+                 spriteRenderer.sprite = "assets/dirt.json";
+                 gameObject.addComponent(spriteRenderer);
+                 scene.addGameObject(gameObject);
+             }
+             */
             GE.SceneManager.start();
             requestAnimationFrame(this.update.bind(this));
-            GE.Renderer.render();
         }
         update() {
-            GE.SceneManager.activateScene("testScene");
             this._fpsLabel.innerHTML = "fps: " + GE.Time.frameRate;
-            GE.gl.clear(GE.gl.COLOR_BUFFER_BIT);
-            this._shader.use();
-            let projectionPosition = this._shader.getUniformLocation("projection");
-            GE.gl.uniformMatrix2fv(projectionPosition, false, new Float32Array(GE.SceneManager.activeScene.camera.projection.data));
+            let quadLabel = document.querySelector(".quadsLabel");
+            quadLabel.innerHTML = "quads: " + GE.Renderer.quads;
+            let go = GE.SceneManager.activeScene.find("controled");
+            let component = go.getComponent("SpriteRenderer");
+            component.color = GE.Color.yellow();
+            go.transform.rotation += GE.degRad(1);
+            //go.transform.scale.add(new Vector2(1 * Time.deltaTime, 1 * Time.deltaTime));
             GE.SceneManager.update();
-            GE.SceneManager.render(this._shader);
+            GE.Renderer.render();
+            let camera = GE.SceneManager.activeScene.camera;
+            let movingSpeed = 5;
+            let zoomSpeed = .2;
+            let rotationSpeed = .5;
+            if (GE.Input.isKeyDown(GE.keyCodes.W)) {
+                camera.transform.position.add(new GE.Vector2(0, 1).multiply(-movingSpeed * GE.Time.deltaTime));
+            }
+            if (GE.Input.isKeyDown(GE.keyCodes.S)) {
+                camera.transform.position.add(new GE.Vector2(0, 1).multiply(movingSpeed * GE.Time.deltaTime));
+            }
+            if (GE.Input.isKeyDown(GE.keyCodes.A)) {
+                camera.transform.position.add(new GE.Vector2(1, 0).multiply(movingSpeed * GE.Time.deltaTime));
+            }
+            if (GE.Input.isKeyDown(GE.keyCodes.D)) {
+                camera.transform.position.add(new GE.Vector2(1, 0).multiply(-movingSpeed * GE.Time.deltaTime));
+            }
+            if (GE.Input.isKeyDown(GE.keyCodes.RIGHT_ARROW)) {
+                camera.transform.rotation += -rotationSpeed * GE.Time.deltaTime;
+            }
+            if (GE.Input.isKeyDown(GE.keyCodes.LEFT_ARROW)) {
+                camera.transform.rotation += rotationSpeed * GE.Time.deltaTime;
+            }
+            if (GE.Input.isKeyDown(GE.keyCodes.UP_ARROW)) {
+                camera.distance += -zoomSpeed * GE.Time.deltaTime;
+            }
+            if (GE.Input.isKeyDown(GE.keyCodes.DOWN_ARROW)) {
+                camera.distance += zoomSpeed * GE.Time.deltaTime;
+            }
             GE.Input.update();
             GE.Time.update();
             if (this.run) {
@@ -111,24 +151,42 @@ var GE;
             precision mediump float;
 
             attribute vec2 vertexPosition;
-            attribute vec2 uv;
             
+            attribute vec2 v_uv;
+            attribute float v_textureIndex;
+
+            attribute float layer;
+
+            attribute vec4 v_tint;
+            
+            attribute vec2 position;
+            
+            attribute vec2 scale;
+            attribute float rotation;
+            
+
             varying vec2 fuv;
+            varying float textureIndex;
+            varying vec4 tint;
             
             uniform mat2 projection;
-            
-            uniform vec2 position;
-            uniform mat2 rotation;
-            uniform vec2 scale;
+            uniform vec2 cameraPosition;
+            uniform float cameraRotation;
+
+            mat2 rotationZ(float rotation){
+                return mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
+            }
             
             void main(){
-                fuv = uv;
+                fuv = v_uv;
                 fuv.y = 1.0 - fuv.y;
-                vec2 finalPosition = projection * (position + (vertexPosition  * scale * rotation));
-                gl_Position = vec4(finalPosition,0, 1);
+                tint = v_tint;
+                textureIndex = v_textureIndex;
+                gl_Position = vec4(projection * (cameraPosition + (position + (vertexPosition * scale * rotationZ(rotation))) * rotationZ(cameraRotation)), -layer, 1);
             }
             `;
             let fragment = `
+            #define numTextures 8
             #ifdef GL_FRAGMENT_PRECISION_HIGH
                 precision highp float;
             #else
@@ -136,13 +194,28 @@ var GE;
             #endif
 
             varying vec2 fuv;
+            varying float textureIndex;
+            varying vec4 tint;
 
-            uniform vec4 tint;
-            uniform sampler2D texture;
 
+            uniform sampler2D textures[numTextures];
+            uniform int textureNumber;
 
-            void main(){
-                gl_FragColor = texture2D(texture, fuv) * tint;
+                void main(){
+                
+                int texIndex = int(textureIndex);  
+                if(texIndex == 0){
+                    texIndex = textureNumber -1;
+                }
+                else{
+                    texIndex = texIndex -1;
+                }
+                for (int i = 0; i< numTextures; i++) {
+                    if (i == texIndex) {
+                        gl_FragColor = texture2D(textures[i], fuv) * tint;
+                        break;
+                    } 
+                } 
             }
             `;
             this._shader = new GE.Shader("basic", vertex, fragment);
@@ -222,6 +295,98 @@ var GE;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
+    class Objects {
+        constructor() {
+        }
+        /*
+        example
+        -----------
+
+
+        {
+            type: "", // the object name
+            constructor: [
+
+            ], // the constructor arguments
+            properties: {
+
+            }
+        }
+
+        
+        */
+        static loadJson(source) {
+            return this.load(JSON.parse(source));
+        }
+        static load(source) {
+            if (source.type === "String" || source.type === "Number" || source.type === "Boolean") {
+                return source.value;
+            }
+            else if (source.type === "Array") {
+                return this.loadArray(source.value);
+            }
+            else {
+                return this.loadObject(source.value);
+            }
+        }
+        static loadObject(source) {
+            let constructorData = this.loadArray(source.constructor);
+            let object = eval(`new ${source.type}(...constructorData);`);
+            for (let property in source.properties) {
+                if (property in object) {
+                    object[property] = this.load(source.properties[property]);
+                }
+            }
+            return object;
+        }
+        static loadArray(array) {
+            let result = [];
+            for (let i = 0; i < array.length; i++) {
+                result.push(this.load(array[i]));
+            }
+            return result;
+        }
+        static stringify(object) {
+            return JSON.stringify(this.parse(object));
+        }
+        static parse(property) {
+            console.log(property);
+            if (Array.isArray(property)) {
+                return this.parseArray(property);
+            }
+            else if (typeof property === "object") {
+                return this.parseObject(property);
+            }
+            else {
+                return {
+                    type: property.constructor.name,
+                    value: property
+                };
+            }
+        }
+        static parseObject(object) {
+            let properties = {};
+            let result = {
+                type: object.constructor.name,
+                properties: properties
+            };
+            for (let property in object) {
+                properties[property] = this.parse(object[property]);
+            }
+            return result;
+        }
+        static parseArray(array) {
+            let result = [];
+            for (let i = 0; i < array.length; i++) {
+                result.push(this.parse(array[i]));
+            }
+            return result;
+        }
+    }
+    GE.Objects = Objects;
+})(GE || (GE = {}));
+var GE;
+(function (GE) {
     class Time {
         constructor() { }
         /**
@@ -273,33 +438,25 @@ var GE;
         static isEmpty(array) {
             return array.length < 1;
         }
-    }
-    GE.ArrayUtil = ArrayUtil;
-    class Array extends window.Array {
-        constructor(length) {
-            super(length);
-        }
-        isEmpty() {
-            return super.length < 1;
-        }
-        remove(index) {
-            console.log(index);
-            console.log(super.slice(index, index + 1));
-            console.log(super.toString());
-        }
-        removeEmptyStrings() {
-            let i = 0;
-            while (super.length > i) {
-                if (super[i] === "") {
-                    this.remove(i);
-                }
-                else {
-                    i++;
+        static removeEmptyStrings(stringArray) {
+            let result = [];
+            for (let i = 0; i < stringArray.length; i++) {
+                if (!(stringArray[i] === "")) {
+                    result.push(stringArray[i]);
                 }
             }
+            return result;
+        }
+        static contains(array, item) {
+            return array.some(elem => {
+                return JSON.stringify(elem) === JSON.stringify(item);
+            });
+        }
+        static indexof(array, item) {
+            return array.findIndex(x => JSON.stringify(x) === JSON.stringify(item));
         }
     }
-    GE.Array = Array;
+    GE.ArrayUtil = ArrayUtil;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
@@ -460,6 +617,11 @@ var GE;
         }
         render(shader) {
         }
+        get name() {
+            return this._name;
+        }
+        onEnable() {
+        }
     }
     GE.Component = Component;
 })(GE || (GE = {}));
@@ -551,13 +713,11 @@ var GE;
             positionAttribute.location = 0;
             positionAttribute.offset = 0;
             positionAttribute.size = 2;
-            positionAttribute.stride = 4;
             this._buffer.addAttribute(positionAttribute);
             let uvAttribute = new GE.AttributeInfo();
             uvAttribute.location = 1;
             uvAttribute.offset = 2;
             uvAttribute.size = 2;
-            uvAttribute.stride = 4;
             this._buffer.addAttribute(uvAttribute);
             this._buffer.pushData(vertecies);
             this._buffer.upload();
@@ -595,51 +755,123 @@ var GE;
         constructor() {
             super(...arguments);
             this._color = GE.Color.white();
+            this._layer = "background";
+            this._orderInLayer = 0;
         }
         start() {
         }
         update() {
+            GE.Renderer.modifyPosition(this._batchID, this.transfrom.position);
+            GE.Renderer.modifyRotation(this._batchID, this.transfrom.rotation);
+            GE.Renderer.modifyScale(this._batchID, this.transfrom.scale);
+        }
+        onEnable() {
+            if (this.gameObject.enabled === true && (this._batchID === undefined || this._batchID === null)) {
+                this._batchID = GE.Renderer.add(this.getBatchData());
+            }
+            else if (!(this._batchID === undefined || this._batchID === null)) {
+                GE.Renderer.remove(this._batchID);
+                this._batchID = null;
+            }
         }
         set sprite(path) {
             this._sprite = path;
-            if (!this._batchDataId === undefined) {
-                GE.Renderer.remove(this._batchDataId);
+            if (this.gameObject.enabled === true) {
+                if (!(this._batchID === undefined || this._batchID === null)) {
+                    GE.Renderer.remove(this._batchID);
+                }
+                this._batchID = GE.Renderer.add(this.getBatchData());
             }
-            let data = GE.Renderer.add(path, this.gameObject, this._color);
-            this._batchDataId = data.id;
         }
         get sprite() {
             return this._sprite;
+        }
+        get color() {
+            return this._color;
+        }
+        set color(color) {
+            this._color = color;
+            if (!(this._batchID === undefined || this._batchID === null)) {
+                GE.Renderer.modifyColor(this._batchID, color);
+            }
+        }
+        getBatchData() {
+            return {
+                position: this.gameObject.transform.position,
+                rotation: this.gameObject.transform.rotation,
+                scale: this.gameObject.transform.scale,
+                sprite: GE.Renderer.getSprite(this._sprite),
+                color: this.color,
+                layer: this.layer,
+                orderInLayer: this.orderInLayer
+            };
+        }
+        get layer() {
+            return this._layer;
+        }
+        set layer(layer) {
+            this._layer = layer;
+        }
+        get orderInLayer() {
+            return this._orderInLayer;
+        }
+        set orderInLayer(orderInLayer) {
+            if (orderInLayer >= GE.maxLayerOrderNumber || orderInLayer < 0) {
+                throw new Error("Range Error: order in layer is outside the range.");
+            }
+            this._orderInLayer = orderInLayer;
         }
     }
     GE.SpriteRenderer = SpriteRenderer;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
+    /**
+     *
+     */
     class GameObject {
         constructor(name, scene) {
             this._transform = new GE.Transform();
             this._components = [];
-            this.enabled = true;
+            this._enabled = true;
             this._transform = new GE.Transform();
             this._name = name;
             this._scene = scene;
         }
+        /**
+         * the transform of the object that contains the position, rotation and scale
+         */
         get transform() {
             return this._transform;
         }
+        /**
+         * the name of the object
+         */
         get name() {
             return this._name;
         }
+        /**
+         * the parent game object
+         */
         get parent() {
             return this._parent;
         }
+        /**
+         * the scene that the object is located in
+         */
         get scene() {
             return this._scene;
         }
+        /**
+         * add a component to the game object
+         * @param component
+         */
         addComponent(component) {
             this._components.push(component);
         }
+        /**
+         * start all of the object's component
+         */
         start() {
             if (!this.enabled) {
                 return;
@@ -648,6 +880,9 @@ var GE;
                 this._components[i].start();
             }
         }
+        /**
+         * updates the components
+         */
         update() {
             if (!this.enabled) {
                 return;
@@ -656,11 +891,22 @@ var GE;
                 this._components[i].update();
             }
         }
-        render(shader) {
-            if (!this.enabled) {
-                return;
+        getComponent(name) {
+            for (let i = 0; i < this._components.length; i++) {
+                if (this._components[i].name === name) {
+                    return this._components[i];
+                }
             }
-            this._components[0].render(shader);
+            return undefined;
+        }
+        get enabled() {
+            return this._enabled;
+        }
+        set enabled(state) {
+            this._enabled = state;
+            for (let i = 0; i < this._components.length; i++) {
+                this._components[i].onEnable();
+            }
         }
     }
     GE.GameObject = GameObject;
@@ -669,16 +915,27 @@ var GE;
 var GE;
 (function (GE) {
     class MainCamera extends GE.GameObject {
+        constructor() {
+            super(...arguments);
+            this._distance = 0;
+        }
         start() {
         }
         update() {
         }
         resize() {
-            this._projection = GE.Matrix2x2.projection(0, GE.canvas.width, 0, GE.canvas.height);
+            this._projection = GE.Matrix2x2.projection(0, GE.canvas.width, 0, GE.canvas.height, this._distance);
             GE.gl.viewport(0, 0, GE.canvas.width, GE.canvas.height);
         }
         get projection() {
             return this._projection;
+        }
+        get distance() {
+            return this._distance;
+        }
+        set distance(distance) {
+            this._distance = distance;
+            this.resize();
         }
     }
     GE.MainCamera = MainCamera;
@@ -765,7 +1022,7 @@ var GE;
         bind(normalized = false) {
             GE.gl.bindBuffer(this._targetBufferType, this._buffer);
             for (let attribute of this._attributes) {
-                GE.gl.vertexAttribPointer(attribute.location, attribute.size, this._dataType, normalized, attribute.stride * this._typeSize, attribute.offset * this._typeSize);
+                GE.gl.vertexAttribPointer(attribute.location, attribute.size, this._dataType, normalized, this._elementSize * this._typeSize, attribute.offset * this._typeSize);
                 GE.gl.enableVertexAttribArray(attribute.location);
             }
         }
@@ -781,14 +1038,19 @@ var GE;
         addAttribute(attribute) {
             this._attributes.push(attribute);
         }
+        /**
+         * saving the data for uploading
+         * @param data the data
+         */
         pushData(data) {
-            for (let d of data) {
-                this._data.push(d);
-            }
+            this._data = data;
         }
+        /**
+         * upload the data to the gpu
+         */
         upload() {
             GE.gl.bindBuffer(this._targetBufferType, this._buffer);
-            let bufferData = new Float32Array(this._data);
+            let bufferData;
             switch (this._dataType) {
                 case GE.gl.FLOAT:
                     bufferData = new Float32Array(this._data);
@@ -811,6 +1073,8 @@ var GE;
                 case GE.gl.UNSIGNED_BYTE:
                     bufferData = new Uint8Array(this._data);
                     break;
+                default:
+                    bufferData = new Float32Array(this._data);
             }
             GE.gl.bufferData(this._targetBufferType, bufferData, this._dataIncome);
         }
@@ -848,8 +1112,9 @@ var GE;
             }
             this._maxTextures = GE.gl.getParameter(GE.gl.MAX_TEXTURE_IMAGE_UNITS);
             GE.gl.enable(GE.gl.BLEND);
-            //gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
             GE.gl.blendFunc(GE.gl.SRC_ALPHA, GE.gl.ONE_MINUS_SRC_ALPHA);
+            GE.gl.enable(GE.gl.DEPTH_TEST);
+            GE.gl.depthFunc(GE.gl.LESS);
         }
         static get maxTextures() {
             return this._maxTextures;
@@ -867,6 +1132,7 @@ var GE;
          * @param fragmentSrc The fragment shader source code.
          */
         constructor(name, vertexSrc, fragmentSrc) {
+            this._uniforms = {};
             this._name = name;
             let vertexShader = this.loadShader(GE.gl.VERTEX_SHADER, vertexSrc);
             let fragmentShader = this.loadShader(GE.gl.FRAGMENT_SHADER, fragmentSrc);
@@ -905,11 +1171,11 @@ var GE;
         get name() {
             return this._name;
         }
-        setAttribute(name, buffer) {
-            let attributeLocation = GE.gl.getAttribLocation(this._program, name);
-            GE.gl.bindBuffer(GE.gl.ARRAY_BUFFER, buffer);
-            //gl.vertexAttribPointer();
-        }
+        /**
+         *
+         * @param name the name of the attribute
+         * @returns returns the attribute location in the shader
+         */
         getAttributeLocation(name) {
             let attributeLocation = GE.gl.getAttribLocation(this._program, name);
             if (attributeLocation === -1) {
@@ -917,11 +1183,20 @@ var GE;
             }
             return attributeLocation;
         }
+        /**
+         *
+         * @param name the name of the uniform
+         * @returns returns the uniform location in the shader
+         */
         getUniformLocation(name) {
+            if (this._uniforms.hasOwnProperty(name)) {
+                return this._uniforms[name];
+            }
             let attributeLocation = GE.gl.getUniformLocation(this._program, name);
             if (attributeLocation === null) {
                 throw new Error("Unable to find uniform named '" + name + "' in shader named '" + this._name + "'");
             }
+            this._uniforms[name] = attributeLocation;
             return attributeLocation;
         }
     }
@@ -929,6 +1204,9 @@ var GE;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
+    /**
+     * the texture is a contaner for the image to use in the webgl
+     */
     class Texture {
         constructor(image, mipmap = GE.Mipmap.auto) {
             this._mipmap = mipmap;
@@ -944,24 +1222,36 @@ var GE;
                 this._image = image;
                 this.setup();
             }
-            //gl.activeTexture(gl.TEXTURE0 + this._textureSlot);
-            //gl.bindTexture(gl.TEXTURE_2D, this._texture);
         }
+        /**
+         * pass this texture to the gpu to proccess and rendering
+         * @param textureSlot the texture slot to bind it to
+         */
         bind(textureSlot) {
             GE.gl.bindTexture(GE.gl.TEXTURE_2D, this._texture);
-            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MAG_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
-            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MIN_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
             GE.gl.activeTexture(GE.gl.TEXTURE0 + textureSlot);
         }
+        /**
+         * delete the texture from the gpu
+         */
         destroy() {
             GE.gl.deleteTexture(this._texture);
         }
-        size() {
+        /**
+         * the size of the image
+         */
+        get size() {
             return new GE.Vector2(this._image.width, this._image.height);
         }
+        /**
+         * the way the gpu resize the image
+         */
         get mipmap() {
             return this._mipmap;
         }
+        /**
+         * the way the gpu resize the image
+         */
         set mipmap(mipmap) {
             this._mipmap = mipmap;
         }
@@ -973,43 +1263,182 @@ var GE;
             GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MAG_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
             GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MIN_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
         }
+        /**
+         * update the texture update the mipmap
+         */
+        update() {
+            GE.gl.bindTexture(GE.gl.TEXTURE_2D, this._texture);
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MAG_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
+            GE.gl.texParameteri(GE.gl.TEXTURE_2D, GE.gl.TEXTURE_MIN_FILTER, GE.Renderer.getMipmapGlNumber(this._mipmap));
+        }
+        /**
+         * the source of the image
+         */
+        get src() {
+            return this._image.src;
+        }
     }
     GE.Texture = Texture;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
     GE.batchMaxQuads = 10000;
+    const verteciesNumber = 6;
+    const elementSize = 15;
+    const quadData = [
+        [-0.5, -0.5, 0, 0],
+        [0.5, 0.5, 1, 1],
+        [0.5, -0.5, 1, 0],
+        [-0.5, 0.5, 0, 1],
+        [0.5, 0.5, 1, 1],
+        [-0.5, -0.5, 0, 0]
+    ];
     class Batch {
-        constructor() {
-            this._data = [];
+        constructor(shader) {
+            this._ids = [];
+            this._vertexData = [];
             this._textures = [];
-            this._vertexBuffer = new GE.GLBuffer(12, GE.gl.DYNAMIC_DRAW);
+            this._vertexBuffer = new GE.GLBuffer(elementSize, GE.gl.DYNAMIC_DRAW);
             this._vertexBuffer.bind();
-            this._indeciesBuffer = new GE.GLBuffer(4, GE.gl.STATIC_DRAW, GE.gl.UNSIGNED_INT, GE.gl.ELEMENT_ARRAY_BUFFER);
-            this._indeciesBuffer.pushData(this.generateIndecies());
+            //set up all of the attributes
+            // the vertex position
+            let vertexPositionAttribute = new GE.AttributeInfo();
+            vertexPositionAttribute.location = shader.getAttributeLocation("vertexPosition");
+            vertexPositionAttribute.offset = 0;
+            vertexPositionAttribute.size = 2;
+            this._vertexBuffer.addAttribute(vertexPositionAttribute);
+            // the uv of the image
+            let textureCorrdinatesAttribute = new GE.AttributeInfo();
+            textureCorrdinatesAttribute.location = shader.getAttributeLocation("v_uv");
+            textureCorrdinatesAttribute.offset = 2;
+            textureCorrdinatesAttribute.size = 2;
+            this._vertexBuffer.addAttribute(textureCorrdinatesAttribute);
+            // the texture number in the sampler array
+            let textureIndexAttribute = new GE.AttributeInfo();
+            textureIndexAttribute.location = shader.getAttributeLocation("v_textureIndex");
+            textureIndexAttribute.offset = 4;
+            textureIndexAttribute.size = 1;
+            this._vertexBuffer.addAttribute(textureIndexAttribute);
+            // the layer the object is in
+            let layerAttribute = new GE.AttributeInfo();
+            layerAttribute.location = shader.getAttributeLocation("layer");
+            layerAttribute.offset = 5;
+            layerAttribute.size = 1;
+            this._vertexBuffer.addAttribute(layerAttribute);
+            // the tint of the object
+            let tintAttribute = new GE.AttributeInfo();
+            tintAttribute.location = shader.getAttributeLocation("v_tint");
+            tintAttribute.offset = 6;
+            tintAttribute.size = 4;
+            this._vertexBuffer.addAttribute(tintAttribute);
+            // the object position            
+            let positionAttribute = new GE.AttributeInfo();
+            positionAttribute.location = shader.getAttributeLocation("position");
+            positionAttribute.offset = 10;
+            positionAttribute.size = 2;
+            this._vertexBuffer.addAttribute(positionAttribute);
+            // the object scale
+            let scaleAttribute = new GE.AttributeInfo();
+            scaleAttribute.location = shader.getAttributeLocation("scale");
+            scaleAttribute.offset = 12;
+            scaleAttribute.size = 2;
+            this._vertexBuffer.addAttribute(scaleAttribute);
+            // the object rotation
+            let rotationAttribute = new GE.AttributeInfo();
+            rotationAttribute.location = shader.getAttributeLocation("rotation");
+            rotationAttribute.offset = 14;
+            rotationAttribute.size = 1;
+            this._vertexBuffer.addAttribute(rotationAttribute);
         }
-        add(data) {
-            if (this._data.length < GE.batchMaxQuads) {
+        /**
+         * add an object to the batch
+        * @param data the batch data of an objects
+        */
+        add(data, id) {
+            // chacking 
+            if (this._ids.length < GE.batchMaxQuads) {
                 for (let i = 0; i < this._textures.length; i++) {
                     if (this._textures[i] == data.sprite.texture) {
-                        this._data.push(data);
+                        this._ids.push(id);
+                        this._vertexData.push(...this.getQuadData(data));
                         return;
                     }
                 }
                 if (this._textures.length < GE.GLUtilties.maxTextures) {
                     this._textures.push(data.sprite.texture);
-                    this._data.push(data);
+                    this._ids.push(id);
+                    this._vertexData.push(...this.getQuadData(data));
                 }
             }
         }
+        /**
+         * remove the object data from the batch
+         * @param data the batch data is required to identify where the object location is
+         */
         remove(id) {
-            this._data.slice(id, 1);
+            let index = this._ids.indexOf(id);
+            this._ids.slice(index, 1);
+            this._vertexData.slice(index * elementSize * verteciesNumber, elementSize * verteciesNumber);
         }
-        modify(id, color) {
-            this._data[id].color = color;
+        getVertexArrayPosition(batchId) {
+            return this._ids.indexOf(batchId) * elementSize * verteciesNumber;
+        }
+        modifyColor(batchId, color) {
+            let colorArray = color.toArray();
+            let index = this.getVertexArrayPosition(batchId);
+            for (let i = index; i < index + verteciesNumber * elementSize; i += elementSize) {
+                this._vertexData[i + 6] = colorArray[0];
+                this._vertexData[i + 7] = colorArray[1];
+                this._vertexData[i + 8] = colorArray[2];
+                this._vertexData[i + 9] = colorArray[3];
+            }
+        }
+        modifyPosition(batchId, position) {
+            let positionArray = position.toArray();
+            let index = this.getVertexArrayPosition(batchId);
+            for (let i = index; i < index + verteciesNumber * elementSize; i += elementSize) {
+                this._vertexData[i + 10] = positionArray[0];
+                this._vertexData[i + 11] = positionArray[1];
+            }
+        }
+        modifyRotation(batchId, rotation) {
+            let index = this.getVertexArrayPosition(batchId);
+            for (let i = index; i < index + verteciesNumber * elementSize; i += elementSize) {
+                this._vertexData[i + 14] = rotation;
+            }
+        }
+        modifyScale(batchId, scale) {
+            let scaleArray = scale.toArray();
+            let index = this.getVertexArrayPosition(batchId);
+            for (let i = index; i < index + verteciesNumber * elementSize; i += elementSize) {
+                this._vertexData[i + 12] = scaleArray[0];
+                this._vertexData[i + 13] = scaleArray[1];
+            }
+        }
+        render(shader) {
+            /*
+            for(let i = 0; i < this._ids.length; i++){
+                console.log(this._ids[i].sprite.texture);
+            }*/
+            //this.prepareData();
+            this._vertexBuffer.pushData(this._vertexData);
+            this._vertexBuffer.upload();
+            //this._indeciesBuffer.upload();
+            let samplers = [];
+            for (let i = 0; i < this._textures.length; i++) {
+                this._textures[i].bind(i);
+                samplers.push(i);
+            }
+            GE.gl.uniform1iv(shader.getUniformLocation("textures"), samplers);
+            GE.gl.uniform1i(shader.getUniformLocation("textureNumber"), samplers.length);
+            this._vertexBuffer.bind();
+            //this._indeciesBuffer.bind();
+            this._vertexBuffer.draw();
+            this._vertexBuffer.unbind();
+            //this._indeciesBuffer.unbind();
         }
         generateIndecies() {
-            let elements = new GE.Array(GE.batchMaxQuads * 6);
+            let elements = new Array(GE.batchMaxQuads * 6);
             for (let i = 0; i < GE.batchMaxQuads; i++) {
                 // 6 cause in 1 quad there are 6 indecies
                 let indexOffset = i * 6;
@@ -1019,17 +1448,33 @@ var GE;
                 elements[indexOffset] = vertexOffset + 3;
                 elements[indexOffset + 1] = vertexOffset + 2;
                 elements[indexOffset + 2] = vertexOffset;
-                // triangle 3
-                elements[indexOffset + 3] = vertexOffset + 2;
-                elements[indexOffset + 4] = vertexOffset;
-                elements[indexOffset + 5] = vertexOffset + 1;
+                // triangle 2   
+                elements[indexOffset + 3] = vertexOffset;
+                elements[indexOffset + 4] = vertexOffset + 1;
+                elements[indexOffset + 5] = vertexOffset + 3;
             }
             return elements;
         }
-        render() {
+        getQuadData(batchData) {
+            let vertexData = [];
+            for (let j = 0; j < verteciesNumber; j++) {
+                vertexData.push(...quadData[j]); // vertex position and uv. note: uv is temporery
+                //vertexData.push(batchData.sprite)
+                vertexData.push(this._textures.indexOf(batchData.sprite.texture)); // texture index
+                vertexData.push(GE.Renderer.getLayerIndex(batchData.layer, batchData.orderInLayer));
+                vertexData.push(...batchData.color.toArray()); //color
+                vertexData.push(...batchData.position.toArray()); // position
+                vertexData.push(...batchData.scale.toArray()); //scale
+                vertexData.push(batchData.rotation); //rotation
+            }
+            return vertexData;
+        }
+        removeData() {
+            this._ids = [];
+            this._vertexData = [];
         }
         hasQuadRoom() {
-            return this._data.length < GE.batchMaxQuads;
+            return this._ids.length < GE.batchMaxQuads;
         }
         canRenderSprite(sprite) {
             for (let i = 0; i < this._textures.length; i++) {
@@ -1042,9 +1487,6 @@ var GE;
             }
             return false;
         }
-        get numberOfQuads() {
-            return this._data.length;
-        }
     }
     GE.Batch = Batch;
 })(GE || (GE = {}));
@@ -1052,42 +1494,49 @@ var GE;
 (function (GE) {
     class Renderer {
         constructor() { }
-        static start() {
-            this._batches = [new GE.Batch()];
+        static start(shader) {
+            GE.gl.clearColor(0, 0, 0, 1);
+            this._shader = shader;
+            this._batches = [new GE.Batch(this._shader)];
         }
-        static add(spritePath, gameObject, color) {
+        static add(batchData) {
+            this._quads++;
             for (let i = 0; i < this._batches.length; i++) {
-                if (this._batches[i].hasQuadRoom() && this._batches[i].canRenderSprite(this._sprites[spritePath])) {
-                    let id = i * GE.batchMaxQuads + this._batches[i].numberOfQuads;
-                    let data = {
-                        sprite: this.getSprite(spritePath),
-                        gameObject: gameObject,
-                        color: color,
-                        id: id
+                if (this._batches[i].hasQuadRoom() && this._batches[i].canRenderSprite(batchData.sprite)) {
+                    let batchId = {
+                        id: i
                     };
-                    this._batches[i].add(data);
-                    return data;
+                    this._batches[i].add(batchData, batchId);
+                    return batchId;
                 }
             }
-            this._batches.push(new GE.Batch());
-            let id = (this._batches.length - 1) * GE.batchMaxQuads + this._batches[-1].numberOfQuads;
-            let data = {
-                sprite: this._sprites[spritePath],
-                gameObject: gameObject,
-                color: color,
-                id: id
+            this._batches.push(new GE.Batch(this._shader));
+            let batchId = {
+                id: this._batches.length - 1
             };
-            this._batches[-1].add(data);
-            this._quads++;
-            return data;
+            this._batches[this._batches.length - 1].add(batchData, batchId);
+            return batchId;
         }
-        static remove(id) {
-            this._batches[Math.floor(id / GE.batchMaxQuads)].remove(id % GE.batchMaxQuads);
+        static remove(batchId) {
+            this._batches[batchId.id].remove(batchId);
             this._quads--;
         }
         static render() {
-            console.log(this._sprites);
-            console.log(this._batches);
+            GE.gl.clear(GE.gl.COLOR_BUFFER_BIT | GE.gl.DEPTH_BUFFER_BIT);
+            //gl.clear(gl.DEPTH_BUFFER_BIT);
+            this._shader.use();
+            let projectionPosition = this._shader.getUniformLocation("projection");
+            GE.gl.uniformMatrix2fv(projectionPosition, false, new Float32Array(GE.SceneManager.activeScene.camera.projection.data));
+            let cameraPositionPosition = this._shader.getUniformLocation("cameraPosition");
+            GE.gl.uniform2fv(cameraPositionPosition, new Float32Array(GE.SceneManager.activeScene.camera.transform.position.toArray()));
+            let cameraRotationPosition = this._shader.getUniformLocation("cameraRotation");
+            GE.gl.uniform1f(cameraRotationPosition, GE.SceneManager.activeScene.camera.transform.rotation);
+            for (let texture in this._textures) {
+                this._textures[texture].update();
+            }
+            this._batches.forEach(batch => {
+                batch.render(this._shader);
+            });
         }
         static getSprite(path) {
             // getting already loaded sprite
@@ -1099,26 +1548,44 @@ var GE;
             if (spriteData === undefined) {
                 throw new Error("the sprite sheet '" + path + "' was not found in the imported files");
             }
-            let uv = [
-                new GE.Vector2(0, 0),
-                new GE.Vector2(1, 1)
-            ];
+            let texture;
             if (spriteData.texture in this._textures) {
-                let sprite = new GE.Sprite(this._textures[spriteData.texture], uv);
-                this._sprites[path] = sprite;
-                return sprite;
+                texture = this._textures[spriteData.texture];
             }
             else {
                 let textureImg = GE.AssetManager.getAssetData(spriteData.texture);
                 if (!(textureImg === undefined)) {
-                    let texture = new GE.Texture(textureImg);
-                    this._textures[spriteData.texture] = texture;
-                    let sprite = new GE.Sprite(texture, uv);
-                    this._sprites[path] = sprite;
-                    return sprite;
+                    texture = new GE.Texture(textureImg);
                 }
-                throw new Error("the sprite sheet's image '" + spriteData.texture + "' was not found in the imported files");
+                else {
+                    throw new Error("the sprite sheet's image '" + spriteData.texture + "' was not found in the imported files");
+                }
             }
+            let uv = {
+                "position": new GE.Vector2(0, 0),
+                "size": texture.size
+            };
+            if ("uv" in spriteData) {
+                if ("position" in spriteData.uv) {
+                    if ("x" in spriteData.uv.position && "y" in spriteData.uv.position) {
+                        uv.position = new GE.Vector2(spriteData.uv.position.x, spriteData.uv.position.y);
+                    }
+                    else {
+                        throw new Error("Error in the sprite sheet's uv position.");
+                    }
+                }
+                if ("size" in spriteData.uv) {
+                    if ("x" in spriteData.uv.size && "y" in spriteData.uv.size) {
+                        uv.size = new GE.Vector2(spriteData.uv.size.x, spriteData.uv.size.y);
+                    }
+                    else {
+                        throw new Error("Error in the sprite sheet's uv size.");
+                    }
+                }
+            }
+            let sprite = new GE.Sprite(texture, uv.position, uv.size);
+            this._sprites[path] = sprite;
+            return sprite;
         }
         static getMipmapGlNumber(mipmap) {
             if (mipmap === Mipmap.linear) {
@@ -1145,12 +1612,31 @@ var GE;
                 }
             }
         }
-        static modify(id, data) {
-            this._batches[Math.floor(id / GE.batchMaxQuads)].modify(id % GE.batchMaxQuads, data);
+        static modifyColor(batchId, color) {
+            this._batches[batchId.id].modifyColor(batchId, color);
+        }
+        static modifyPosition(batchId, position) {
+            this._batches[batchId.id].modifyPosition(batchId, position);
+        }
+        static modifyRotation(batchId, rotation) {
+            this._batches[batchId.id].modifyRotation(batchId, rotation);
+        }
+        static modifyScale(batchId, scale) {
+            this._batches[batchId.id].modifyScale(batchId, scale);
+        }
+        static addLayer(name, index) {
+            this._layers[name] = index;
+        }
+        static getLayerIndex(layer, orderInLayer) {
+            return (this._layers[layer] + orderInLayer / GE.maxLayerOrderNumber) / (Object.keys(this._layers).length.toString().length * 10);
+        }
+        static get quads() {
+            return this._quads;
         }
     }
     Renderer._textures = {};
     Renderer._sprites = {};
+    Renderer._layers = {};
     Renderer._quads = 0;
     GE.Renderer = Renderer;
     let Mipmap;
@@ -1160,6 +1646,7 @@ var GE;
         Mipmap[Mipmap["auto"] = 2] = "auto";
     })(Mipmap = GE.Mipmap || (GE.Mipmap = {}));
     ;
+    GE.maxLayerOrderNumber = 10000;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
@@ -1273,9 +1760,12 @@ var GE;
 var GE;
 (function (GE) {
     class Sprite {
-        constructor(texture, uv) {
+        constructor(texture, uvPosition, uvSize) {
             this._uv = [];
             this._texture = texture;
+            this._uv.push(uvPosition);
+            this._uv.push(uvPosition.add(uvSize));
+            let lo = this._uv.push();
         }
         get uv() {
             return this._uv;
@@ -1366,28 +1856,28 @@ var GE;
 (function (GE) {
     class Input {
         constructor() { }
+        /**
+         * the start function of the input module
+         */
         static start() {
             window.addEventListener('keydown', (e) => {
-                if (!GE.contains(this._currentKeysDown, [e.keyCode, e.location])) {
+                if (!GE.ArrayUtil.contains(this._currentKeysDown, [e.keyCode, e.location])) {
                     this._currentKeysDown.push([e.keyCode, e.location]);
                 }
-                if (GE.contains(this._currentKeysUp, [e.keyCode, e.location])) {
-                    this._currentKeysUp.splice(GE.indexof(this._currentKeysUp, [e.keyCode, e.location]), 1);
+                if (GE.ArrayUtil.contains(this._currentKeysUp, [e.keyCode, e.location])) {
+                    this._currentKeysUp.splice(GE.ArrayUtil.indexof(this._currentKeysUp, [e.keyCode, e.location]), 1);
                 }
-                if (GE.contains(this._keysReleasedUpdated, [e.keyCode, e.location])) {
-                    this._keysReleasedUpdated.splice(GE.indexof(this._keysReleasedUpdated, [e.keyCode, e.location]), 1);
+                if (GE.ArrayUtil.contains(this._keysReleasedUpdated, [e.keyCode, e.location])) {
+                    this._keysReleasedUpdated.splice(GE.ArrayUtil.indexof(this._keysReleasedUpdated, [e.keyCode, e.location]), 1);
                 }
             });
             window.addEventListener('keyup', (e) => {
-                //if (!contains(this._currentKeysUp, [e.keyCode, e.location])) {
-                //    this._currentKeysUp.push([e.keyCode, e.location]);
-                //}
                 this._currentKeysUp.push([e.keyCode, e.location]);
-                if (GE.contains(this._currentKeysDown, [e.keyCode, e.location])) {
-                    this._currentKeysDown.splice(GE.indexof(this._currentKeysDown, [e.keyCode, e.location]), 1);
+                if (GE.ArrayUtil.contains(this._currentKeysDown, [e.keyCode, e.location])) {
+                    this._currentKeysDown.splice(GE.ArrayUtil.indexof(this._currentKeysDown, [e.keyCode, e.location]), 1);
                 }
-                if (GE.contains(this._keysPressedUpdated, [e.keyCode, e.location])) {
-                    this._keysPressedUpdated.splice(GE.indexof(this._keysPressedUpdated, [e.keyCode, e.location]), 1);
+                if (GE.ArrayUtil.contains(this._keysPressedUpdated, [e.keyCode, e.location])) {
+                    this._keysPressedUpdated.splice(GE.ArrayUtil.indexof(this._keysPressedUpdated, [e.keyCode, e.location]), 1);
                 }
             });
             window.addEventListener("wheel", (e) => {
@@ -1401,35 +1891,38 @@ var GE;
             window.addEventListener("mousedown", (e) => {
                 this._mousePostion = new GE.Vector2(e.x, e.y);
                 this._currentMouseButtonsDown.push(e.button);
-                if (GE.contains(this._currentMouseButtonsUp, e.button)) {
-                    this._currentMouseButtonsUp.splice(GE.indexof(this._currentMouseButtonsUp, e.button), 1);
+                if (GE.ArrayUtil.contains(this._currentMouseButtonsUp, e.button)) {
+                    this._currentMouseButtonsUp.splice(GE.ArrayUtil.indexof(this._currentMouseButtonsUp, e.button), 1);
                 }
-                if (GE.contains(this._mouseButtonsReleasedUpdated, e.button)) {
-                    this._mouseButtonsReleasedUpdated.splice(GE.indexof(this._mouseButtonsReleasedUpdated, e.button), 1);
+                if (GE.ArrayUtil.contains(this._mouseButtonsReleasedUpdated, e.button)) {
+                    this._mouseButtonsReleasedUpdated.splice(GE.ArrayUtil.indexof(this._mouseButtonsReleasedUpdated, e.button), 1);
                 }
             });
             window.addEventListener("mouseup", (e) => {
                 this._mousePostion = new GE.Vector2(e.x, e.y);
                 this._currentMouseButtonsUp.push(e.button);
-                if (GE.contains(this._currentMouseButtonsDown, e.button)) {
-                    this._currentMouseButtonsDown.splice(GE.indexof(this._currentMouseButtonsDown, e.button), 1);
+                if (GE.ArrayUtil.contains(this._currentMouseButtonsDown, e.button)) {
+                    this._currentMouseButtonsDown.splice(GE.ArrayUtil.indexof(this._currentMouseButtonsDown, e.button), 1);
                 }
-                if (GE.contains(this._mouseButtonsPressedUpdated, e.button)) {
-                    this._mouseButtonsPressedUpdated.splice(GE.indexof(this._mouseButtonsPressedUpdated, e.button), 1);
+                if (GE.ArrayUtil.contains(this._mouseButtonsPressedUpdated, e.button)) {
+                    this._mouseButtonsPressedUpdated.splice(GE.ArrayUtil.indexof(this._mouseButtonsPressedUpdated, e.button), 1);
                 }
             });
         }
+        /**
+         * the update function of the input module
+         */
         static update() {
             this._keysPressed = [];
             this._keysReleased = [];
             for (let i = 0; i < this._currentKeysDown.length; i++) {
-                if (!GE.contains(this._keysPressedUpdated, this._currentKeysDown[i])) {
+                if (!GE.ArrayUtil.contains(this._keysPressedUpdated, this._currentKeysDown[i])) {
                     this._keysPressed.push(this._currentKeysDown[i]);
                     this._keysPressedUpdated.push(this._currentKeysDown[i]);
                 }
             }
             for (let i = 0; i < this._currentKeysUp.length; i++) {
-                if (!GE.contains(this._keysReleasedUpdated, this._currentKeysUp[i])) {
+                if (!GE.ArrayUtil.contains(this._keysReleasedUpdated, this._currentKeysUp[i])) {
                     this._keysReleased.push(this._currentKeysUp[i]);
                     this._keysReleasedUpdated.push(this._currentKeysUp[i]);
                 }
@@ -1437,13 +1930,13 @@ var GE;
             this._mouseButtonsPressed = [];
             this._mouseButtonsReleased = [];
             for (let i = 0; i < this._currentMouseButtonsDown.length; i++) {
-                if (!GE.contains(this._mouseButtonsPressedUpdated, this._currentMouseButtonsDown[i])) {
+                if (!GE.ArrayUtil.contains(this._mouseButtonsPressedUpdated, this._currentMouseButtonsDown[i])) {
                     this._mouseButtonsPressed.push(this._currentMouseButtonsDown[i]);
                     this._mouseButtonsPressedUpdated.push(this._currentMouseButtonsDown[i]);
                 }
             }
             for (let i = 0; i < this._currentMouseButtonsUp.length; i++) {
-                if (!GE.contains(this._mouseButtonsReleasedUpdated, this._currentMouseButtonsUp[i])) {
+                if (!GE.ArrayUtil.contains(this._mouseButtonsReleasedUpdated, this._currentMouseButtonsUp[i])) {
                     this._mouseButtonsReleased.push(this._currentMouseButtonsUp[i]);
                     this._mouseButtonsReleasedUpdated.push(this._currentMouseButtonsUp[i]);
                 }
@@ -1454,27 +1947,65 @@ var GE;
                 this._scrollUpdated = true;
             }
         }
+        /**
+         *
+         * @param keyCode the keycode of the key for shortcut use the keyCode class
+         * @returns true if the key is currently down or false if it is up
+         */
         static isKeyDown(keyCode) {
-            return GE.contains(this._currentKeysDown, keyCode);
+            return GE.ArrayUtil.contains(this._currentKeysDown, keyCode);
         }
+        /**
+         *
+         * @param keyCode the keycode of the key for shortcut use the keyCode class
+         * @returns true if the key was pressed in the last frame
+         */
         static isKeyPressed(keyCode) {
-            return GE.contains(this._keysPressed, keyCode);
+            return GE.ArrayUtil.contains(this._keysPressed, keyCode);
         }
+        /**
+         *
+         * @param keyCode the keycode of the key for shortcut use the keyCode class
+         * @returns true if the key was released in the last frame
+         */
         static isKeyReleased(keyCode) {
-            return GE.contains(this._keysReleased, keyCode);
+            return GE.ArrayUtil.contains(this._keysReleased, keyCode);
         }
+        /**
+         *
+         * @param button the mouse button number
+         * @returns true if the button is currently down or false if it is up
+         */
         static isMouseButtonDown(button) {
-            return GE.contains(this._currentMouseButtonsDown, button);
+            return GE.ArrayUtil.contains(this._currentMouseButtonsDown, button);
         }
+        /**
+         *
+         * @param button the mouse button number
+         * @returns true if the button was pressed in the last frame
+         */
         static isMouseButtonPressed(button) {
-            return GE.contains(this._mouseButtonsPressed, button);
+            return GE.ArrayUtil.contains(this._mouseButtonsPressed, button);
         }
+        /**
+         *
+         * @param button the mouse button number
+         * @returns true if the button was released in the last frame
+         */
         static isMouseButtonReleased(button) {
-            return GE.contains(this._mouseButtonsReleased, button);
+            return GE.ArrayUtil.contains(this._mouseButtonsReleased, button);
         }
+        /**
+         *
+         * @returns return the mouse wheel scrool direction in the last frame 0 for no scrolling
+         */
         static scroll() {
             return this._mouseWheel;
         }
+        /**
+         *
+         * @returns the mouse position
+         */
         static mousePosition() {
             return this._mousePostion;
         }
@@ -1576,6 +2107,10 @@ var GE;
     keyCodes.RIGHT_ALT = [18, 2];
     keyCodes.CONTEXT_MENU = [93, 0];
     keyCodes.CONTROL_RIGHT = [17, 2];
+    keyCodes.LEFT_ARROW = [37, 0];
+    keyCodes.RIGHT_ARROW = [39, 0];
+    keyCodes.UP_ARROW = [38, 0];
+    keyCodes.DOWN_ARROW = [40, 0];
     GE.keyCodes = keyCodes;
 })(GE || (GE = {}));
 const keyCodes = {
@@ -1682,12 +2217,15 @@ var GE;
         static identity() {
             return new Matrix2x2();
         }
-        static projection(left, right, bottom, top) {
+        static projection(left, right, bottom, top, distance) {
             let mat = new Matrix2x2();
             let leftRight = 1 / (left - right);
             let bottomTop = 1 / (bottom - top);
-            mat._data[0] = (-sizeUnit) * leftRight;
-            mat._data[3] = (-sizeUnit) * bottomTop;
+            if (distance > 1) {
+                distance = 1;
+            }
+            mat._data[0] = (-sizeUnit) * leftRight + (-sizeUnit) * leftRight * -distance;
+            mat._data[3] = (-sizeUnit) * bottomTop + (-sizeUnit) * bottomTop * -distance;
             return mat;
         }
         static rotation(angle) {
@@ -1711,42 +2249,6 @@ var GE;
         }
     }
     GE.Matrix2x2 = Matrix2x2;
-})(GE || (GE = {}));
-var GE;
-(function (GE) {
-    const sizeUnit = 200;
-    class Matrix4 {
-        constructor() {
-            this._data = [];
-            this._data = [
-                1, 0, 0, 0,
-                0, 1, 0, 0,
-                0, 0, 1, 0,
-                0, 0, 0, 1
-            ];
-        }
-        get data() {
-            return this._data;
-        }
-        static identity() {
-            return new Matrix4();
-        }
-        static projection(left, right, bottom, top) {
-            let mat = new Matrix4();
-            let leftRight = 1 / (left - right);
-            let bottomTop = 1 / (bottom - top);
-            mat._data[0] = (-sizeUnit) * leftRight;
-            mat._data[5] = (-sizeUnit) * bottomTop;
-            return mat;
-        }
-        static transformations(position) {
-            let mat = new Matrix4();
-            mat._data[12] = position.x;
-            mat._data[13] = position.y;
-            return mat;
-        }
-    }
-    GE.Matrix4 = Matrix4;
 })(GE || (GE = {}));
 var GE;
 (function (GE) {
@@ -1804,18 +2306,15 @@ var GE;
             }
         }
         update() {
+            this._camera.update();
             for (let i = 0; i < this._gameObjects.length; i++) {
                 this._gameObjects[i].update();
             }
         }
         start() {
+            this._camera.start();
             for (let i = 0; i < this._gameObjects.length; i++) {
                 this._gameObjects[i].start();
-            }
-        }
-        render(shader) {
-            for (let i = 0; i < this._gameObjects.length; i++) {
-                this._gameObjects[i].render(shader);
             }
         }
         onActivate() {
@@ -1878,13 +2377,19 @@ var GE;
                     gameObject.transform.scale = new GE.Vector2(data.transform.scale.x, data.transform.scale.y);
                 }
             }
+            if (data.enabled !== undefined) {
+                gameObject.enabled = data.enabled;
+            }
+            else {
+                gameObject.enabled = true;
+            }
             if (data.components !== undefined) {
                 for (let i = 0; i < data.components.length; i++) {
                     let componentData = data.components[i];
                     if (componentData.type === undefined) {
                         throw new Error("Scene file format exception: Component type is not defined.");
                     }
-                    let component = eval("new GE." + componentData.type + "('fggs', gameObject)");
+                    let component = eval("new GE." + componentData.type + "('" + componentData.type + "', gameObject)");
                     for (let param in data.components[i]) {
                         if (param === "type") {
                             continue;
@@ -1896,9 +2401,6 @@ var GE;
                     }
                     gameObject.addComponent(component);
                 }
-            }
-            if (gameObject.enabled !== undefined) {
-                gameObject.enabled = data["enabled"];
             }
             return gameObject;
         }
@@ -1920,64 +2422,10 @@ var GE;
         static update() {
             this._activeScene.update();
         }
-        static render(shader) {
-            this._activeScene.render(shader);
-        }
         static get activeScene() {
             return this._activeScene;
         }
     }
     SceneManager._scenes = [];
     GE.SceneManager = SceneManager;
-})(GE || (GE = {}));
-var GE;
-(function (GE) {
-    class ShaderManager {
-        constructor() { }
-        static getShader(name) {
-            return this._shaders[name];
-        }
-        static loadShader(vertexFilePath, fragmentFilePath, name) {
-            //fileReader(vertexFilePath, this.sourceCallback.bind(this), name + ".vertex");
-            //fileReader(fragmentFilePath, this.sourceCallback.bind(this), name + ".fragment");
-            this._shaderSources[name] = {};
-        }
-        static sourceCallback(source, name) {
-            let nameSeperated = name.split(".");
-            let shaderType = nameSeperated[nameSeperated.length - 1];
-            nameSeperated.pop();
-            name = nameSeperated.join(".");
-            this._shaderSources[name][shaderType] = source;
-            if (this._shaderSources[name].hasOwnProperty("vertex") && this._shaderSources[name].hasOwnProperty("fragment")) {
-                this._shaders[name] = new GE.Shader(name, this._shaderSources[name]["vertex"], this._shaderSources[name]["fragment"]);
-                delete this._shaderSources[name];
-            }
-        }
-    }
-    ShaderManager._shaders = {};
-    ShaderManager._shaderSources = {};
-    GE.ShaderManager = ShaderManager;
-})(GE || (GE = {}));
-var GE;
-(function (GE) {
-    function removeEmptyStrings(stringArray) {
-        let result = [];
-        for (let i = 0; i < stringArray.length; i++) {
-            if (!(stringArray[i] === "")) {
-                result.push(stringArray[i]);
-            }
-        }
-        return result;
-    }
-    GE.removeEmptyStrings = removeEmptyStrings;
-    function contains(array, item) {
-        return array.some(elem => {
-            return JSON.stringify(elem) === JSON.stringify(item);
-        });
-    }
-    GE.contains = contains;
-    function indexof(array, item) {
-        return array.findIndex(x => JSON.stringify(x) === JSON.stringify(item));
-    }
-    GE.indexof = indexof;
 })(GE || (GE = {}));

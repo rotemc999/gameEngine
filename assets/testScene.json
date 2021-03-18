@@ -1,26 +1,126 @@
 {
     "name": "testScene",
-    "gameObjects": [
-        {
-            "name": "testObject",
+    "gameObjects": [{
+            "name": "controled",
             "enabled": true,
             "transform": {
                 "position": {
                     "x": 0,
                     "y": 0
                 },
-                "rotation": 3.14159,
+                "rotation": 90,
+                "scale": {
+                    "x": 10,
+                    "y": 10
+                }
+            },
+            "components": [{
+                "type": "SpriteRenderer",
+                "layer": "background",
+                "orderInLayer": 0,
+                "sprite": "assets/testSprite.json"
+            }]
+        },
+        {
+            "name": "tex",
+            "enabled": true,
+            "transform": {
+                "position": {
+                    "x": 0,
+                    "y": 1
+                },
+                "rotation": 10,
                 "scale": {
                     "x": 1,
                     "y": 2
-                } 
-            },
-            "components": [
-                {
-                    "type": "SpriteRenderer",
-                    "sprite": "assets/rectangle.json"
                 }
-            ]
+            },
+            "components": [{
+                "type": "SpriteRenderer",
+                "layer": "foreground",
+                "orderInLayer": 9999,
+                "sprite": "assets/rectangle.json"
+            }]
+        },
+        {
+            "name": "testObject",
+            "enabled": true,
+            "transform": {
+                "position": {
+                    "x": 5,
+                    "y": 4
+                },
+                "rotation": 46,
+                "scale": {
+                    "x": 1,
+                    "y": 2
+                }
+            },
+            "components": [{
+                "type": "SpriteRenderer",
+                "layer": "foreground",
+                "sprite": "assets/testSprite.json"
+            }]
+        },
+        {
+            "name": "testObject",
+            "enabled": true,
+            "transform": {
+                "position": {
+                    "x": -4,
+                    "y": 4
+                },
+                "rotation": 90,
+                "scale": {
+                    "x": 1,
+                    "y": 2
+                }
+            },
+            "components": [{
+                "type": "SpriteRenderer",
+                "layer": "foreground",
+                "sprite": "assets/circle.json"
+            }]
+        },
+        {
+            "name": "testObject",
+            "enabled": true,
+            "transform": {
+                "position": {
+                    "x": -2,
+                    "y": -4
+                },
+                "rotation": 0,
+                "scale": {
+                    "x": 1,
+                    "y": 1
+                }
+            },
+            "components": [{
+                "type": "SpriteRenderer",
+                "layer": "foreground",
+                "sprite": "assets/crate.json"
+            }]
+        },
+        {
+            "name": "testObject",
+            "enabled": true,
+            "transform": {
+                "position": {
+                    "x": -4,
+                    "y": -4
+                },
+                "rotation": 0,
+                "scale": {
+                    "x": 1,
+                    "y": 1
+                }
+            },
+            "components": [{
+                "type": "SpriteRenderer",
+                "layer": "foreground",
+                "sprite": "assets/dirt.json"
+            }]
         }
     ]
 }

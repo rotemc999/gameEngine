@@ -28,5 +28,13 @@ namespace GE {
         public render(shader: Shader) {
 
         }
+
+        public get name(): string{
+            return this._name;
+        }
+
+        public onEnable(): void{
+            
+        }
     }
 }

@@ -7,50 +7,64 @@ namespace GE{
         public static mipmap: Mipmap;
         private static _textures: {[path: string]:Texture} = {};
         private static _sprites: {[path: string]:Sprite} = {};
+        private static _layers: {[name: string]: number} = {};
         private static _quads: number = 0;
+        private static _shader: Shader;
         private constructor(){}
 
 
 
-        public static start(): void{
-            this._batches = [new Batch()];
+        public static start(shader: Shader): void{
+            gl.clearColor(0, 0, 0, 1);
+            this._shader = shader;
+            this._batches = [new Batch(this._shader)];
         }
 
-        public static add(spritePath: string, gameObject: GameObject, color: Color): BatchData{
+        public static add(batchData: BatchData): BatchID{
+            this._quads++;
             for(let i = 0; i < this._batches.length; i++){
-                if(this._batches[i].hasQuadRoom() && this._batches[i].canRenderSprite(this._sprites[spritePath])){
-                    let id = i * batchMaxQuads + this._batches[i].numberOfQuads;
-                    let data = {
-                        sprite: this.getSprite(spritePath),
-                        gameObject: gameObject,
-                        color: color,
-                        id: id
-                    };
-                    this._batches[i].add(data);
-                    return data;
+                if(this._batches[i].hasQuadRoom() && this._batches[i].canRenderSprite(batchData.sprite)){
+                    let batchId = {
+                        id: i
+                    }
+                    this._batches[i].add(batchData, batchId);
+                    return batchId; 
                 }
             }
-            this._batches.push(new Batch());
-            let id = (this._batches.length-1) * batchMaxQuads + this._batches[-1].numberOfQuads;
-            let data = {
-                sprite: this._sprites[spritePath],
-                gameObject: gameObject,
-                color: color,
-                id: id
+            this._batches.push(new Batch(this._shader));
+            let batchId = {
+                id: this._batches.length-1
             };
-            this._batches[-1].add(data);
-            this._quads++;
-            return data;
+            this._batches[this._batches.length -1].add(batchData, batchId);
+            return batchId;
         }
 
-        public static remove(id: number): void{
-            this._batches[Math.floor(id / batchMaxQuads)].remove(id % batchMaxQuads);
+        public static remove(batchId: BatchID): void{
+            this._batches[batchId.id].remove(batchId);
             this._quads--;
         }
 
         public static render(): void{
-            console.log(this._sprites)
-            console.log(this._batches);
+            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+            //gl.clear(gl.DEPTH_BUFFER_BIT);
+            this._shader.use();
+
+            let projectionPosition: WebGLUniformLocation = this._shader.getUniformLocation("projection");
+            gl.uniformMatrix2fv(projectionPosition, false, new Float32Array(SceneManager.activeScene.camera.projection.data));
+
+            let cameraPositionPosition: WebGLUniformLocation = this._shader.getUniformLocation("cameraPosition");
+            gl.uniform2fv(cameraPositionPosition, new Float32Array(SceneManager.activeScene.camera.transform.position.toArray()));
+
+            let cameraRotationPosition: WebGLUniformLocation = this._shader.getUniformLocation("cameraRotation");
+            gl.uniform1f(cameraRotationPosition, SceneManager.activeScene.camera.transform.rotation);
+
+            for(let texture in this._textures){
+                this._textures[texture].update();
+            }
+
+            this._batches.forEach(batch => {
+                batch.render(this._shader);
+            });
         }
 
         public static getSprite(path: string): Sprite{
@@ -63,26 +77,48 @@ namespace GE{
             if(spriteData === undefined){
                 throw new Error("the sprite sheet '"+path+"' was not found in the imported files");
             }
-            let uv = [
-                new Vector2(0,0),
-                new Vector2(1,1)
-            ];
+
+            let texture;
             if(spriteData.texture in this._textures){
-                let sprite = new Sprite(this._textures[spriteData.texture], uv);
-                this._sprites[path] = sprite;
-                return sprite;
+                texture = this._textures[spriteData.texture];
             }
             else{
                 let textureImg = AssetManager.getAssetData(spriteData.texture);
                 if(!(textureImg === undefined)){
-                    let texture = new Texture(textureImg);
-                    this._textures[spriteData.texture] = texture;
-                    let sprite = new Sprite(texture, uv);
-                    this._sprites[path] = sprite;
-                    return sprite;
+                    texture = new Texture(textureImg);
                 }
-                throw new Error("the sprite sheet's image '"+spriteData.texture+"' was not found in the imported files")
+                else{
+                    throw new Error("the sprite sheet's image '"+spriteData.texture+"' was not found in the imported files");
+                }
             }
+
+            let uv = {
+                "position": new Vector2(0,0),
+                "size": texture.size
+            };
+            if("uv" in spriteData){
+                if("position" in spriteData.uv){
+                    if("x" in spriteData.uv.position && "y" in spriteData.uv.position){
+                        uv.position = new Vector2(spriteData.uv.position.x, spriteData.uv.position.y);
+                    }
+                    else{
+                        throw new Error("Error in the sprite sheet's uv position.");
+                    }
+                }
+                if("size" in spriteData.uv){
+                    if("x" in spriteData.uv.size && "y" in spriteData.uv.size){
+                        uv.size = new Vector2(spriteData.uv.size.x, spriteData.uv.size.y);
+                    }
+                    else{
+                        throw new Error("Error in the sprite sheet's uv size.");
+                    }
+                }
+            }
+
+            
+            let sprite = new Sprite(texture, uv.position, uv.size);
+            this._sprites[path] = sprite;
+            return sprite;
         }
 
         public static getMipmapGlNumber(mipmap: Mipmap): number{
@@ -111,8 +147,32 @@ namespace GE{
             }
         }
 
-        public static modify(id: number, data: any): void{
-            this._batches[Math.floor(id / batchMaxQuads)].modify(id % batchMaxQuads, data);
+        public static modifyColor(batchId: BatchID, color: Color): void{
+            this._batches[batchId.id].modifyColor(batchId, color);
+        }
+
+        public static modifyPosition(batchId: BatchID, position: Vector2): void{
+            this._batches[batchId.id].modifyPosition(batchId, position);
+        }
+
+        public static modifyRotation(batchId: BatchID, rotation: number): void{
+            this._batches[batchId.id].modifyRotation(batchId, rotation);
+        }
+
+        public static modifyScale(batchId: BatchID, scale: Vector2): void{
+            this._batches[batchId.id].modifyScale(batchId, scale);
+        }
+
+        public static addLayer(name: string, index: number): void{
+            this._layers[name] = index;
+        }
+
+        public static getLayerIndex(layer: string, orderInLayer: number): number{
+            return (this._layers[layer] + orderInLayer / maxLayerOrderNumber) / (Object.keys(this._layers).length.toString().length * 10);
+        }
+
+        public static get quads(): number{
+            return this._quads;
         }
     }
 
@@ -121,4 +181,6 @@ namespace GE{
         linear,
         auto
     };
+
+    export const maxLayerOrderNumber: number = 10000;
 }

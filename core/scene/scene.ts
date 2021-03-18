@@ -37,20 +37,16 @@ namespace GE {
 
 
         public update(): void {
+            this._camera.update();
             for (let i: number = 0; i < this._gameObjects.length; i++) {
                 this._gameObjects[i].update();
             }
         }
 
         public start(): void {
+            this._camera.start();
             for (let i: number = 0; i < this._gameObjects.length; i++) {
                 this._gameObjects[i].start();
-            }
-        }
-
-        public render(shader: Shader): void {
-            for (let i: number = 0; i < this._gameObjects.length; i++) {
-                this._gameObjects[i].render(shader);
             }
         }
 

@@ -25,14 +25,12 @@ namespace GE {
             positionAttribute.location = 0;
             positionAttribute.offset = 0;
             positionAttribute.size = 2;
-            positionAttribute.stride = 4;
             this._buffer.addAttribute(positionAttribute);
 
             let uvAttribute: AttributeInfo = new AttributeInfo();
             uvAttribute.location = 1;
             uvAttribute.offset = 2;
             uvAttribute.size = 2;
-            uvAttribute.stride = 4;
             this._buffer.addAttribute(uvAttribute);
 
 

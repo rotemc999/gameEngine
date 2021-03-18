@@ -65,7 +65,7 @@ namespace GE {
             gl.bindBuffer(this._targetBufferType, this._buffer);
 
             for (let attribute of this._attributes) {
-                gl.vertexAttribPointer(attribute.location, attribute.size, this._dataType, normalized, attribute.stride * this._typeSize, attribute.offset * this._typeSize);
+                gl.vertexAttribPointer(attribute.location, attribute.size, this._dataType, normalized, this._elementSize * this._typeSize, attribute.offset * this._typeSize);
                 gl.enableVertexAttribArray(attribute.location);
             }
         }
@@ -84,16 +84,21 @@ namespace GE {
             this._attributes.push(attribute);
         }
 
+        /**
+         * saving the data for uploading
+         * @param data the data
+         */
         public pushData(data: number[]): void {
-            for (let d of data) {
-                this._data.push(d);
-            }
+           this._data = data;
         }
 
+        /**
+         * upload the data to the gpu
+         */
         public upload(): void {
             gl.bindBuffer(this._targetBufferType, this._buffer);
 
-            let bufferData: ArrayBuffer = new Float32Array(this._data);
+            let bufferData: ArrayBuffer;
             switch (this._dataType) {
                 case gl.FLOAT:
                     bufferData = new Float32Array(this._data);
@@ -116,6 +121,8 @@ namespace GE {
                 case gl.UNSIGNED_BYTE:
                     bufferData = new Uint8Array(this._data);
                     break;
+                default:
+                    bufferData = new Float32Array(this._data);
             }
 
             gl.bufferData(this._targetBufferType, bufferData, this._dataIncome);
@@ -148,9 +155,5 @@ namespace GE {
          * The number of elements from the begining of the buffer.
          */
         public offset: number;
-        /**
-         * The number of elements between every start of the attribute.
-         */
-        public stride: number;
     }
 }

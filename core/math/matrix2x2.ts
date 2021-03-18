@@ -18,13 +18,16 @@ namespace GE {
             return new Matrix2x2();
         }
 
-        public static projection(left: number, right: number, bottom: number, top: number): Matrix2x2 {
+        public static projection(left: number, right: number, bottom: number, top: number, distance: number): Matrix2x2 {
             let mat: Matrix2x2 = new Matrix2x2();
             let leftRight: number = 1 / (left - right);
             let bottomTop: number = 1 / (bottom - top);
-
-            mat._data[0] = (-sizeUnit) * leftRight;
-            mat._data[3] = (-sizeUnit) * bottomTop;
+            if(distance > 1){
+                distance = 1;
+            }
+        
+            mat._data[0] = (-sizeUnit) * leftRight+(-sizeUnit) * leftRight * -distance;
+            mat._data[3] = (-sizeUnit) * bottomTop + (-sizeUnit) * bottomTop * -distance;
 
             return mat;
         }

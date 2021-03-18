@@ -82,5 +82,11 @@ namespace GE {
         public static readonly CONTEXT_MENU: number[] = [93, 0];
         public static readonly CONTROL_RIGHT: number[] = [17, 2];
 
+
+        public static readonly LEFT_ARROW: number[] = [37, 0];
+        public static readonly RIGHT_ARROW: number[] = [39, 0];
+        public static readonly UP_ARROW: number[] = [38, 0];
+        public static readonly DOWN_ARROW: number[] = [40, 0];
+
     }
 }

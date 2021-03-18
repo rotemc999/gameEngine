@@ -3,8 +3,14 @@ namespace GE {
         private _uv: Vector2[] = [];
         private _texture: Texture;
 
-        public constructor(texture: Texture, uv: Vector2[]){
+        public constructor(texture: Texture, uvPosition: Vector2, uvSize: Vector2){
             this._texture = texture;
+
+            this._uv.push(uvPosition);
+            this._uv.push(uvPosition.add(uvSize));
+            let lo = 
+            this._uv.push()
+
         }
 
 

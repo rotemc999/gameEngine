@@ -1,6 +1,7 @@
 namespace GE {
     export class Shader {
         private _program: WebGLProgram;
+        private _uniforms: {[name:string]:WebGLUniformLocation} = {};
         private _name: string;
 
         /**
@@ -61,13 +62,11 @@ namespace GE {
             return this._name;
         }
 
-
-        public setAttribute(name: string, buffer: GLBuffer,): void {
-            let attributeLocation: number = gl.getAttribLocation(this._program, name);
-            gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-            //gl.vertexAttribPointer();
-        }
-
+        /**
+         * 
+         * @param name the name of the attribute
+         * @returns returns the attribute location in the shader
+         */
         public getAttributeLocation(name: string): number {
             let attributeLocation: number = gl.getAttribLocation(this._program, name);
             if (attributeLocation === -1) {
@@ -76,13 +75,21 @@ namespace GE {
             return attributeLocation;
         }
 
+        /**
+         * 
+         * @param name the name of the uniform
+         * @returns returns the uniform location in the shader
+         */
         public getUniformLocation(name: string): WebGLUniformLocation {
+            if(this._uniforms.hasOwnProperty(name)){
+                return this._uniforms[name];
+            }
             let attributeLocation: WebGLUniformLocation = gl.getUniformLocation(this._program, name) as WebGLUniformLocation;
             if (attributeLocation === null) {
                 throw new Error("Unable to find uniform named '" + name + "' in shader named '" + this._name + "'");
             }
+            this._uniforms[name] = attributeLocation;
             return attributeLocation;
         }
-
     }
 }

@@ -8,9 +8,13 @@ body{
     overflow: hidden;
 }
 
-.fpsLabel{
+.fpsLabel, .quadsLabel{
     position: absolute;
     top: 10px;
     left: 10px;
     color: white;
+}
+
+.quadsLabel{
+    top: 40px;
 }

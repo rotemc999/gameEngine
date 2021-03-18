@@ -6,7 +6,7 @@ namespace GE {
         private _shader: Shader;
 
         private _unloadedAssestsNum: number = 0;
-
+        private _gameObjects: GameObject[] = [];
         private _fpsLabel: HTMLHeadingElement = document.getElementById("fpsLabel") as HTMLHeadingElement;
         public constructor() {
         }
@@ -30,7 +30,18 @@ namespace GE {
                 };
 
                 //loading renderer data
-                //Renderer.mipmap = Mipmap[configData.renderer.mipmap] as Mipmap;
+                if(configData.renderer.mipmap === "nearest"){
+                    Renderer.mipmap = Mipmap.nearest;
+                }
+                else if(configData.renderer.mipmap === "linear"){
+                    Renderer.mipmap = Mipmap.linear;
+                }
+                else if(configData.renderer.mipmap === "auto"){
+                    Renderer.mipmap = Mipmap.auto;
+                }
+                else{
+                    throw new Error("unknown mipmap type '"+ configData.renderer.mipmap +"'");
+                }
                 //loading renderer sprite sheets data
                 for(let spritePath in configData.renderer.sprites){
                     let spriteFile: FileReader = new FileReader(configData.renderer.sprites[spritePath],configData.renderer.sprites[spritePath]);
@@ -46,6 +57,10 @@ namespace GE {
                         };
                         AssetManager.putAssetData(spriteFile.name , spriteData);
                     };
+                }
+                // load layers
+                for(let i = 0; i < configData.renderer.layers.length; i++){
+                    Renderer.addLayer(configData.renderer.layers[i], i);
                 }
 
                 //loading audio data
@@ -67,11 +82,11 @@ namespace GE {
         private start(): void{
             console.log("start");
             GLUtilties.start();
-            gl.clearColor(0, 0, 0, 1);
+            
             this.loadTextureShaders();
-            this._shader.use();
+            //this._shader.use();
 
-            Renderer.start();
+            Renderer.start(this._shader);
 
             AssetManager.start();
 
@@ -81,42 +96,72 @@ namespace GE {
 
             let scene = SceneManager.loadSceneJson(AssetManager.getAssetData("__config__").firstScene);
             SceneManager.activateScene(scene.name);
-
-            /*
-            let scene = new Scene("scene");
-
-            SceneManager.createScene(scene);
-            SceneManager.activateScene("scene");
-
-            let testGameObject = new GameObject("testing game object", scene);
-            testGameObject.transform.position = new Vector2(10,0);
-            scene.addGameObject(testGameObject);
-
-            let spriteRenderer = new SSpriteRenderer("spriteRenderer", testGameObject);
-            spriteRenderer.texture = "spritesExamples/circle.png";
-            testGameObject.addComponent(spriteRenderer);
-            */
             this.resize();
-
+           /*
+            for(let i = 0; i < 10000; i++){
+                let gameObject = new GameObject("go", scene);
+                gameObject.transform.position.x = i;
+                let spriteRenderer = new SpriteRenderer("sr", gameObject);
+                spriteRenderer.sprite = "assets/dirt.json";
+                gameObject.addComponent(spriteRenderer);
+                scene.addGameObject(gameObject);
+            }
+            */
             SceneManager.start();
-
+            
+            
+            
             requestAnimationFrame(this.update.bind(this));
-
-            Renderer.render();
         }
 
         private update() {
-            SceneManager.activateScene("testScene");
             this._fpsLabel.innerHTML = "fps: " + Time.frameRate;
-            gl.clear(gl.COLOR_BUFFER_BIT);
+            let quadLabel = document.querySelector(".quadsLabel") as HTMLHeadingElement;
+            quadLabel.innerHTML = "quads: " + Renderer.quads;
 
-            this._shader.use();
-
-            let projectionPosition: WebGLUniformLocation = this._shader.getUniformLocation("projection");
-            gl.uniformMatrix2fv(projectionPosition, false, new Float32Array(SceneManager.activeScene.camera.projection.data));
+            let go = SceneManager.activeScene.find("controled") as GameObject;
+            let component: SpriteRenderer = go.getComponent("SpriteRenderer") as SpriteRenderer;
+            component.color = Color.yellow();
+            go.transform.rotation +=degRad(1);
+            //go.transform.scale.add(new Vector2(1 * Time.deltaTime, 1 * Time.deltaTime));
 
             SceneManager.update();
-            SceneManager.render(this._shader);
+            Renderer.render();
+
+
+            let camera = SceneManager.activeScene.camera;
+            let movingSpeed = 5;
+            let zoomSpeed = .2;
+            let rotationSpeed = .5;
+            if(Input.isKeyDown(keyCodes.W)){
+                camera.transform.position.add(new Vector2(0,1).multiply(-movingSpeed * Time.deltaTime));          
+            }
+            if(Input.isKeyDown(keyCodes.S)){
+                camera.transform.position.add(new Vector2(0,1).multiply(movingSpeed * Time.deltaTime));          
+            }
+            if(Input.isKeyDown(keyCodes.A)){
+                camera.transform.position.add(new Vector2(1,0).multiply(movingSpeed * Time.deltaTime));          
+            }
+            if(Input.isKeyDown(keyCodes.D)){
+                camera.transform.position.add(new Vector2(1,0).multiply(-movingSpeed * Time.deltaTime));          
+            }
+
+            if(Input.isKeyDown(keyCodes.RIGHT_ARROW)){
+                camera.transform.rotation += -rotationSpeed * Time.deltaTime;
+            }
+            
+            if(Input.isKeyDown(keyCodes.LEFT_ARROW)){
+                camera.transform.rotation += rotationSpeed * Time.deltaTime;
+            }
+
+            if(Input.isKeyDown(keyCodes.UP_ARROW)){
+                camera.distance += -zoomSpeed * Time.deltaTime;
+            }
+            
+            if(Input.isKeyDown(keyCodes.DOWN_ARROW)){
+                camera.distance += zoomSpeed * Time.deltaTime;
+            }
+
 
             Input.update()
             Time.update();
@@ -138,24 +183,42 @@ namespace GE {
             precision mediump float;
 
             attribute vec2 vertexPosition;
-            attribute vec2 uv;
             
+            attribute vec2 v_uv;
+            attribute float v_textureIndex;
+
+            attribute float layer;
+
+            attribute vec4 v_tint;
+            
+            attribute vec2 position;
+            
+            attribute vec2 scale;
+            attribute float rotation;
+            
+
             varying vec2 fuv;
+            varying float textureIndex;
+            varying vec4 tint;
             
             uniform mat2 projection;
-            
-            uniform vec2 position;
-            uniform mat2 rotation;
-            uniform vec2 scale;
+            uniform vec2 cameraPosition;
+            uniform float cameraRotation;
+
+            mat2 rotationZ(float rotation){
+                return mat2(cos(rotation), -sin(rotation), sin(rotation), cos(rotation));
+            }
             
             void main(){
-                fuv = uv;
+                fuv = v_uv;
                 fuv.y = 1.0 - fuv.y;
-                vec2 finalPosition = projection * (position + (vertexPosition  * scale * rotation));
-                gl_Position = vec4(finalPosition,0, 1);
+                tint = v_tint;
+                textureIndex = v_textureIndex;
+                gl_Position = vec4(projection * (cameraPosition + (position + (vertexPosition * scale * rotationZ(rotation))) * rotationZ(cameraRotation)), -layer, 1);
             }
             `;
             let fragment = `
+            #define numTextures 8
             #ifdef GL_FRAGMENT_PRECISION_HIGH
                 precision highp float;
             #else
@@ -163,13 +226,28 @@ namespace GE {
             #endif
 
             varying vec2 fuv;
+            varying float textureIndex;
+            varying vec4 tint;
 
-            uniform vec4 tint;
-            uniform sampler2D texture;
 
+            uniform sampler2D textures[numTextures];
+            uniform int textureNumber;
 
-            void main(){
-                gl_FragColor = texture2D(texture, fuv) * tint;
+                void main(){
+                
+                int texIndex = int(textureIndex);  
+                if(texIndex == 0){
+                    texIndex = textureNumber -1;
+                }
+                else{
+                    texIndex = texIndex -1;
+                }
+                for (int i = 0; i< numTextures; i++) {
+                    if (i == texIndex) {
+                        gl_FragColor = texture2D(textures[i], fuv) * tint;
+                        break;
+                    } 
+                } 
             }
             `;
 
@@ -182,4 +260,4 @@ namespace GE {
             }
         }
     }
-}
+}   
